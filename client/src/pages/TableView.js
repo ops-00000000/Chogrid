@@ -42,213 +42,69 @@ import { AuthContext } from '../context/AuthContext';
 import { BASE_URL } from '../config';
 import { toast } from 'react-toastify';
 
-// Стилизованные компоненты
+// Упрощенный стиль для контейнера страницы
 const PageContainer = styled(Container)(({ theme }) => ({
-  paddingTop: theme.spacing(4),
-  paddingBottom: theme.spacing(8),
+  maxWidth: '100%',
+  paddingLeft: 0,
+  paddingRight: 0,
+  marginBottom: 0,
+  paddingBottom: 0,
+  minHeight: '100vh'
 }));
 
-const TableTitle = styled(Typography)(({ theme }) => ({
-  marginBottom: theme.spacing(1),
-  fontWeight: 700,
-  color: theme.palette.primary.main,
+// Стиль для заголовка страницы
+const PageHeader = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: theme.spacing(2, 3),
+  backgroundColor: theme.palette.background.paper,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+  margin: 0,
+  borderRadius: 0
+}));
+
+// Стиль для контейнера таблицы
+const TableBox = styled(Paper)(({ theme }) => ({
+  margin: 0,
+  padding: theme.spacing(2),
+  borderRadius: 0,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  width: '100vw',
+  maxWidth: '100vw',
   position: 'relative',
-  display: 'inline-block',
-  '&:after': {
-    content: '""',
-    position: 'absolute',
-    width: '40%',
-    height: '4px',
-    bottom: '-8px',
-    left: '0',
-    borderRadius: '2px',
-    backgroundColor: theme.palette.secondary.main,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  overflowX: 'auto'
+}));
+
+// Стиль для ячейки таблицы с заголовком
+const HeadCell = styled(TableCell)(({ theme }) => ({
+  fontWeight: 'bold',
+  backgroundColor: alpha(theme.palette.primary.main, 0.05)
+}));
+
+// Стиль для ячейки таблицы с данными
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  cursor: props => props.editable === 'true' ? 'pointer' : 'default',
+  '&:hover': {
+    backgroundColor: props => props.editable === 'true' ? alpha(theme.palette.primary.main, 0.05) : 'inherit'
   }
 }));
 
-const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
-  marginTop: theme.spacing(4),
-  borderRadius: '12px',
-  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-  overflow: 'hidden',
-  border: `1px solid ${theme.palette.divider}`,
-}));
-
-const StyledTableHead = styled(TableHead)(({ theme }) => ({
-  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-}));
-
-const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  '&:nth-of-type(odd)': {
-    backgroundColor: alpha(theme.palette.primary.light, 0.03),
-  },
+// Стиль для ячейки с примечаниями
+const NotesCell = styled(StyledTableCell)(({ theme }) => ({
+  fontStyle: 'italic',
+  color: theme.palette.text.secondary,
+  backgroundColor: alpha(theme.palette.info.light, 0.05),
+  cursor: 'pointer',
   '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.light, 0.07),
-    transition: 'background-color 0.2s ease',
-  },
-  transition: 'background-color 0.2s ease',
+    backgroundColor: alpha(theme.palette.info.light, 0.1)
+  }
 }));
 
-const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  padding: theme.spacing(1.5, 2),
-  whiteSpace: 'nowrap',
-}));
-
-const TableHeadCell = styled(TableCell)(({ theme }) => ({
-  fontWeight: 600,
-  color: theme.palette.text.primary,
-  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-  padding: theme.spacing(1.5, 2),
-}));
-
-const ActionButton = styled(IconButton)(({ theme }) => ({
-  margin: theme.spacing(0, 0.5),
-  transition: 'all 0.2s ease',
-  '&:hover': {
-    transform: 'translateY(-2px)',
-  },
-}));
-
-const AddItemButton = styled(Button)(({ theme }) => ({
-  marginTop: theme.spacing(3),
-  borderRadius: '8px',
-  padding: theme.spacing(1.2, 3),
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-  fontWeight: 600,
-  textTransform: 'none',
-  transition: 'all 0.3s ease',
-  '&:hover': {
-    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.15)',
-    transform: 'translateY(-3px)',
-  },
-}));
-
-const StatusChip = styled(Chip)(({ theme, status }) => ({
-  fontWeight: 500,
-  backgroundColor: status === 'public' 
-    ? alpha(theme.palette.success.main, 0.1)
-    : alpha(theme.palette.warning.main, 0.1),
-  color: status === 'public' 
-    ? theme.palette.success.dark
-    : theme.palette.warning.dark,
-  '& .MuiChip-icon': {
-    color: 'inherit',
-  },
-}));
-
-const InfoCard = styled(Card)(({ theme }) => ({
-  height: '100%',
-  borderRadius: '12px',
-  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
-  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-  '&:hover': {
-    transform: 'translateY(-5px)',
-    boxShadow: '0 6px 25px rgba(0, 0, 0, 0.1)',
-  },
-}));
-
-const ModalContent = styled(Box)(({ theme }) => ({
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  maxWidth: '90%',
-  backgroundColor: theme.palette.background.paper,
-  borderRadius: '12px',
-  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
-  padding: theme.spacing(4),
-  outline: 'none',
-  maxHeight: '90vh',
-  overflow: 'auto',
-}));
-
-const ModalTitle = styled(Typography)(({ theme }) => ({
-  marginBottom: theme.spacing(3),
-  fontWeight: 600,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-}));
-
-const ModalCloseButton = styled(IconButton)(({ theme }) => ({
-  position: 'absolute',
-  top: theme.spacing(1),
-  right: theme.spacing(1),
-  color: theme.palette.grey[500],
-}));
-
-const SubmitButton = styled(Button)(({ theme }) => ({
-  margin: theme.spacing(3, 0, 1),
-  borderRadius: '8px',
-  padding: theme.spacing(1.2),
-  fontWeight: 600,
-  textTransform: 'none',
-  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
-  transition: 'all 0.3s ease',
-  '&:hover': {
-    boxShadow: '0 6px 15px rgba(0, 0, 0, 0.15)',
-    transform: 'translateY(-2px)',
-  },
-}));
-
-// Упрощенный компонент модального окна
-const SimpleModal = ({ open, onClose, title, children }) => {
-  if (!open) return null;
-  
-  console.log('Рендерим SimpleModal, open:', open);
-  
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '20px',
-          width: '90%',
-          maxWidth: '500px',
-          maxHeight: '80vh',
-          overflow: 'auto',
-          position: 'relative'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '20px'
-          }}
-          onClick={onClose}
-        >
-          ✕
-        </button>
-        
-        <h2 style={{ marginBottom: '20px' }}>{title}</h2>
-        
-        {children}
-      </div>
-    </div>
-  );
-};
+// Добавляем константу для хранения примечаний в localStorage
+const NOTES_STORAGE_KEY = 'table_notes';
 
 const TableView = () => {
   const { id } = useParams();
@@ -272,6 +128,13 @@ const TableView = () => {
   
   // Добавляю состояние для отображения описания колонки при наведении
   const [columnTooltip, setColumnTooltip] = useState(null);
+  
+  // Добавляем новое состояние для примечаний
+  const [notes, setNotes] = useState({});
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Обновляем состояние для хранения примечаний к характеристикам
+  const [columnNotes, setColumnNotes] = useState({});
   
   // Отслеживание состояния модального окна
   useEffect(() => {
@@ -335,6 +198,86 @@ const TableView = () => {
       // Проверка структуры данных перед их использованием
       if (tableData) {
         setTableData(tableData);
+        
+        // Подробно исследуем элементы, чтобы понять, где хранятся примечания
+        if (tableData.items && tableData.items.length > 0) {
+          console.log('==== ИССЛЕДОВАНИЕ СТРУКТУРЫ ДАННЫХ ЭЛЕМЕНТОВ ====');
+          
+          tableData.items.forEach((item, index) => {
+            console.log(`Элемент ${index + 1} (${item.name || 'без имени'}):`);
+            console.log('- ID:', item._id);
+            console.log('- Поля верхнего уровня:', Object.keys(item));
+            
+            // Проверяем наличие полей с префиксом note_
+            const noteFields = Object.keys(item).filter(key => key.startsWith('note_'));
+            if (noteFields.length > 0) {
+              console.log('- Найдены поля примечаний верхнего уровня:', noteFields);
+              noteFields.forEach(field => {
+                console.log(`  - ${field}: ${item[field]}`);
+              });
+            }
+            
+            // Проверяем ratings
+            if (item.ratings) {
+              console.log('- Объект ratings содержит поля:', Object.keys(item.ratings));
+              
+              // Ищем примечания в ratings
+              const noteRatings = Object.keys(item.ratings).filter(key => key.startsWith('note_'));
+              if (noteRatings.length > 0) {
+                console.log('- Найдены примечания в ratings:', noteRatings);
+                noteRatings.forEach(field => {
+                  console.log(`  - ${field}: ${item.ratings[field]}`);
+                });
+              }
+            }
+            
+            // Проверяем columnNotes
+            if (item.columnNotes) {
+              console.log('- Объект columnNotes содержит поля:', Object.keys(item.columnNotes));
+            }
+            
+            // Проверяем notes
+            if (item.notes) {
+              console.log('- Объект notes содержит поля:', Object.keys(item.notes));
+            }
+            
+            console.log('------------------------------');
+          });
+          
+          console.log('==== КОНЕЦ ИССЛЕДОВАНИЯ ====');
+        }
+        
+        // Загружаем примечания, если они есть в данных
+        if (tableData.items) {
+          const notesMap = {};
+          
+          // Обрабатываем примечания для каждого элемента
+          tableData.items.forEach(item => {
+            if (item.columnNotes) {
+              // Перебираем примечания к характеристикам
+              Object.keys(item.columnNotes).forEach(key => {
+                notesMap[`${item._id}-${key}`] = item.columnNotes[key];
+              });
+            }
+            
+            // Также проверяем ratings на наличие полей с префиксом note_
+            if (item.ratings) {
+              Object.keys(item.ratings).forEach(key => {
+                if (key.startsWith('note_')) {
+                  const columnId = key.substring(5); // Убираем префикс note_
+                  const noteKey = `${item._id}-${columnId}`;
+                  notesMap[noteKey] = item.ratings[key];
+                }
+              });
+            }
+          });
+          
+          // Устанавливаем загруженные примечания
+          if (Object.keys(notesMap).length > 0) {
+            console.log('Загружены примечания к характеристикам:', notesMap);
+            setColumnNotes(notesMap);
+          }
+        }
         
         // Детальное логирование пользователя
         console.log('Текущий пользователь:', user);
@@ -407,6 +350,7 @@ const TableView = () => {
     setFormData({
       name: '',
       cost: '',
+      description: '',
       ...initialFormData
     });
     setFormErrors({});
@@ -484,7 +428,8 @@ const TableView = () => {
       const objectData = {
         name: formData.name,
         cost: parseFloat(formData.cost),
-        ratings: {} // Используем ratings вместо values
+        description: formData.description,
+        ratings: {}
       };
       
       // Добавляем значения критериев
@@ -500,6 +445,18 @@ const TableView = () => {
       const response = await axios.post(`${BASE_URL}/api/tables/${id}/items`, objectData);
       
       console.log('Ответ при добавлении объекта:', response.data);
+      
+      // Если есть примечание, сохраняем его
+      if (formData.note) {
+        // Получаем ID нового объекта
+        const newItemId = response.data.data._id || response.data._id;
+        
+        // Обновляем состояние примечаний
+        setNotes(prev => ({
+          ...prev,
+          [newItemId]: formData.note
+        }));
+      }
       
       // Обновляем данные таблицы
       await fetchTable();
@@ -586,58 +543,208 @@ const TableView = () => {
     setEditValue(e.target.value);
   };
 
-  // Функция для сохранения измененного значения
+  // Функция для получения примечания, сначала из ratings объекта, затем из локального хранилища
+  const getColumnNote = (item, columnName) => {
+    if (!item || !item._id) return '';
+    
+    // Проверяем все возможные места хранения примечаний
+    
+    // 1. Сначала пробуем получить из ratings объекта
+    if (item.ratings && item.ratings[`note_${columnName}`] !== null && item.ratings[`note_${columnName}`] !== undefined) {
+      return item.ratings[`note_${columnName}`];
+    }
+    
+    // 2. Проверяем columnNotes
+    if (item.columnNotes && item.columnNotes[columnName] !== null && item.columnNotes[columnName] !== undefined) {
+      return item.columnNotes[columnName];
+    }
+    
+    // 3. Проверяем notes
+    if (item.notes && item.notes[columnName] !== null && item.notes[columnName] !== undefined) {
+      return item.notes[columnName];
+    }
+    
+    // 4. Проверяем прямое поле с note_ префиксом
+    if (item[`note_${columnName}`] !== null && item[`note_${columnName}`] !== undefined) {
+      return item[`note_${columnName}`];
+    }
+    
+    // 5. Пробуем получить из локального хранилища
+    try {
+      const notesStr = localStorage.getItem(NOTES_STORAGE_KEY);
+      if (notesStr) {
+        const notes = JSON.parse(notesStr);
+        const noteKey = `${item._id}-${columnName}`;
+        if (notes[noteKey]) {
+          return notes[noteKey];
+        }
+      }
+    } catch (e) {
+      console.error('Ошибка при чтении примечаний из localStorage:', e);
+    }
+    
+    return '';
+  };
+
+  // Функция для сохранения примечания в localStorage
+  const saveNoteToLocalStorage = (itemId, columnName, noteValue) => {
+    try {
+      // Получаем текущие примечания или создаем новый объект
+      const notesStr = localStorage.getItem(NOTES_STORAGE_KEY) || '{}';
+      const notes = JSON.parse(notesStr);
+      
+      // Создаем ключ для примечания
+      const noteKey = `${itemId}-${columnName}`;
+      
+      // Сохраняем примечание
+      notes[noteKey] = noteValue;
+      
+      // Обновляем localStorage
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+      
+      console.log('Примечание сохранено в localStorage:', { itemId, columnName, noteValue });
+      return true;
+    } catch (e) {
+      console.error('Ошибка при сохранении примечания в localStorage:', e);
+      return false;
+    }
+  };
+
+  // Функция загрузки примечаний из localStorage
+  const loadNotesFromLocalStorage = () => {
+    try {
+      const notesStr = localStorage.getItem(NOTES_STORAGE_KEY);
+      if (notesStr) {
+        return JSON.parse(notesStr);
+      }
+    } catch (e) {
+      console.error('Ошибка при загрузке примечаний из localStorage:', e);
+    }
+    return {};
+  };
+
+  // Упрощаю функцию handleSaveEdit для примечаний, делая ее идентичной обработке характеристик
   const handleSaveEdit = async (e) => {
     if (e.key === 'Enter' && editingCell) {
-      // Добавляем проверку на наличие метода preventDefault
       if (e.preventDefault && typeof e.preventDefault === 'function') {
         e.preventDefault();
       }
       
       try {
         const {itemId, field} = editingCell;
-        let updatedValue = editValue;
+        console.log('Сохраняем правку для поля:', field);
         
-        // Преобразуем значение в число для числовых полей
-        if (field !== 'name') {
-          updatedValue = parseFloat(editValue);
+        // Получаем элемент из таблицы
+        const item = tableData.items.find(i => i._id === itemId);
+        if (!item) {
+          toast.error('Элемент не найден');
+          return;
+        }
+        
+        let updateData = {};
+        
+        if (field === 'name' || field === 'cost' || field === 'description') {
+          // Поля верхнего уровня
+          updateData[field] = field === 'cost' ? parseFloat(editValue) : editValue;
+        } else if (field.startsWith('note_')) {
+          // Примечания - обрабатываем их ТОЧНО ТАК ЖЕ, как характеристики, только внутри ratings
+          // Сначала сохраняем в localStorage для локальной копии
+          const columnName = field.replace('note_', '');
+          saveNoteToLocalStorage(itemId, columnName, editValue);
+          
+          // Сразу обновляем локальное состояние интерфейса
+          setColumnNotes(prev => ({
+            ...prev,
+            [`${itemId}-${columnName}`]: editValue
+          }));
+          
+          // Обновляем ratings ТОЧНО ТАК ЖЕ, как для обычных характеристик
+          updateData = {
+            ratings: { ...(item.ratings || {}) }
+          };
+          // Добавляем примечание с префиксом note_ в ratings
+          updateData.ratings[field] = editValue;
+          
+          console.log('Обновляем ratings с примечанием:', updateData);
+        } else {
+          // Обычные характеристики
+          let updatedValue = parseFloat(editValue);
           if (isNaN(updatedValue)) {
             toast.error('Введите корректное число');
             return;
           }
-        }
-        
-        // Подготавливаем данные для обновления
-        let updateData = {};
-        
-        // Обрабатываем разные типы полей
-        if (field === 'name' || field === 'cost') {
-          // Прямые поля объекта
-          updateData[field] = updatedValue;
-        } else {
-          // Рейтинги колонок
-          updateData.ratings = {};
+          
+          // Обновляем ratings
+          updateData = {
+            ratings: { ...item.ratings }
+          };
           updateData.ratings[field] = updatedValue;
         }
         
-        // Отправляем запрос на обновление, используем PUT вместо PATCH
-        await axios.put(`${BASE_URL}/api/tables/${id}/items/${itemId}`, updateData);
+        // Отправляем запрос на обновление - ОДИНАКОВЫЙ для всех типов полей
+        const response = await axios.put(
+          `${BASE_URL}/api/tables/${id}/items/${itemId}`,
+          updateData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+        
+        console.log('Успешный ответ сервера:', response.data);
         
         // Обновляем данные таблицы
         await fetchTable();
         
+        // Показываем сообщение об успехе
+        if (field.startsWith('note_')) {
+          toast.success('Примечание сохранено');
+        } else {
+          toast.success('Значение обновлено');
+        }
+        
         // Сбрасываем состояние редактирования
         setEditingCell(null);
-        
-        toast.success('Значение обновлено');
       } catch (err) {
-        console.error('Error updating item:', err);
+        console.error('Ошибка обновления:', err);
+        console.error('Детали ошибки:', err.response?.data);
         toast.error('Ошибка при обновлении значения');
+        setEditingCell(null);
       }
     } else if (e.key === 'Escape') {
-      // Отменяем редактирование при нажатии Escape
       setEditingCell(null);
     }
+  };
+
+  // Обновляем функцию handleEditColumnNote
+  const handleEditColumnNote = (itemId, columnId, columnName) => {
+    console.log('handleEditColumnNote вызван с параметрами:', { itemId, columnId, columnName });
+    
+    if (!isOwner) return;
+    
+    // Используем префикс "note_" для поля
+    const noteField = `note_${columnName}`;
+    
+    console.log('Начинаем редактирование примечания для поля:', noteField);
+    
+    // Установка состояния редактирования
+    setEditingCell({
+      itemId,
+      field: noteField
+    });
+    
+    // Получаем элемент из таблицы
+    const item = tableData.items.find(i => i._id === itemId);
+    
+    // Получаем текущее значение примечания через getColumnNote
+    const currentNote = getColumnNote(item, columnName);
+    
+    console.log('Текущее примечание:', currentNote);
+    
+    // Устанавливаем текущее значение для редактирования
+    setEditValue(currentNote);
   };
 
   // Обработчик клика вне области редактирования для сохранения значения
@@ -662,8 +769,8 @@ const TableView = () => {
   }, [editingCell]);
 
   // Функция для отображения всплывающей подсказки с описанием колонки
-  const handleColumnMouseEnter = (columnId) => {
-    setColumnTooltip(columnId);
+  const handleColumnMouseEnter = (itemColumnId) => {
+    setColumnTooltip(itemColumnId);
   };
 
   const handleColumnMouseLeave = () => {
@@ -709,6 +816,164 @@ const TableView = () => {
     }
   };
 
+  // Функция для обновления примечания к элементу
+  const handleUpdateNote = (itemId, newNote) => {
+    if (!isOwner) return;
+    
+    setNotes(prev => ({
+      ...prev,
+      [itemId]: newNote
+    }));
+    
+    // В реальном приложении здесь должен быть API запрос для сохранения примечания
+    toast.success('Примечание сохранено');
+  };
+
+  // Функция для обработки редактирования примечания
+  const handleEditNote = (itemId) => {
+    if (!isOwner) return;
+    
+    const currentNote = notes[itemId] || '';
+    const newNote = prompt('Введите примечание:', currentNote);
+    
+    if (newNote === null) return; // Пользователь отменил ввод
+    
+    handleUpdateNote(itemId, newNote);
+  };
+
+  // Функция для переключения полноэкранного режима
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  // Обновляем функцию для удаления таблицы
+  const handleDeleteTable = async () => {
+    if (window.confirm('Вы уверены, что хотите удалить эту таблицу?')) {
+      console.log('Начинаем процесс удаления таблицы:', id);
+      
+      try {
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.error('Токен авторизации не найден');
+          toast.error('Пожалуйста, войдите в систему снова');
+          navigate('/login');
+          return;
+        }
+        
+        console.log('Токен авторизации получен');
+        
+        // Настраиваем заголовки для запроса
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+        
+        // Массив различных подходов к удалению таблицы
+        const deletionMethods = [
+          // Метод 1: DELETE с базовым путем
+          async () => {
+            console.log('Попытка 1: DELETE /api/tables/:id');
+            await axios.delete(`${BASE_URL}/api/tables/${id}`, { headers });
+          },
+          
+          // Метод 2: DELETE с /remove
+          async () => {
+            console.log('Попытка 2: DELETE /api/tables/:id/remove');
+            await axios.delete(`${BASE_URL}/api/tables/${id}/remove`, { headers });
+          },
+          
+          // Метод 3: PUT с /destroy
+          async () => {
+            console.log('Попытка 3: PUT /api/tables/:id/destroy');
+            await axios.put(`${BASE_URL}/api/tables/${id}/destroy`, {}, { headers });
+          },
+          
+          // Метод 4: POST с /forceDelete
+          async () => {
+            console.log('Попытка 4: POST /api/tables/:id/forceDelete');
+            await axios.post(`${BASE_URL}/api/tables/${id}/forceDelete`, {}, { headers });
+          },
+          
+          // Метод 5: POST с /delete
+          async () => {
+            console.log('Попытка 5: POST /api/tables/:id/delete');
+            await axios.post(`${BASE_URL}/api/tables/${id}/delete`, {}, { headers });
+          }
+        ];
+        
+        // Перебираем все методы до первого успешного
+        let success = false;
+        let lastError = null;
+        
+        for (const method of deletionMethods) {
+          try {
+            await method();
+            console.log('Таблица успешно удалена!');
+            success = true;
+            break; // Выходим из цикла после успешного удаления
+          } catch (err) {
+            console.error('Ошибка при попытке удаления:', err.message);
+            lastError = err;
+            // Продолжаем перебор методов
+          }
+        }
+        
+        if (success) {
+          toast.success('Таблица успешно удалена!');
+          // Перенаправляем пользователя на страницу со списком таблиц
+          setTimeout(() => navigate('/dashboard'), 1000);
+        } else {
+          // Если все методы не сработали, выводим последнюю ошибку
+          console.error('Все методы удаления не сработали. Последняя ошибка:', lastError);
+          toast.error('Не удалось удалить таблицу. Попробуйте другой метод');
+        }
+      } catch (error) {
+        console.error('Общая ошибка при удалении таблицы:', error);
+        
+        // Детальное логирование ошибки для отладки
+        if (error.response) {
+          console.error('Статус ошибки:', error.response.status);
+          console.error('Данные ошибки:', error.response.data);
+        }
+        
+        toast.error('Ошибка при удалении таблицы');
+      }
+    }
+  };
+
+  // Добавляем стиль для полной высоты контента
+  const html = document.documentElement;
+  const body = document.body;
+  if (html && body) {
+    html.style.height = '100%';
+    html.style.margin = '0';
+    html.style.padding = '0';
+    body.style.height = '100%';
+    body.style.margin = '0';
+    body.style.padding = '0';
+    body.style.overflow = 'hidden';
+    
+    const root = document.getElementById('root');
+    if (root) {
+      root.style.height = '100%';
+      root.style.margin = '0';
+      root.style.padding = '0';
+      root.style.overflow = 'auto';
+    }
+  }
+
+  // Загружаем примечания при монтировании компонента
+  useEffect(() => {
+    // Загружаем примечания из localStorage при первом рендере
+    const localNotes = loadNotesFromLocalStorage();
+    
+    if (Object.keys(localNotes).length > 0) {
+      console.log('Загружены примечания из localStorage:', localNotes);
+      setColumnNotes(prev => ({ ...prev, ...localNotes }));
+    }
+  }, []);
+
   if (loading) {
     return (
       <Box sx={{ 
@@ -747,245 +1012,95 @@ const TableView = () => {
 
   return (
     <PageContainer>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Box sx={{ mb: 4 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
-              <Box sx={{ mb: 2 }}>
-                <TableTitle variant="h4" component="h1">
-                  {tableData?.name}
-                </TableTitle>
-                <Typography variant="body1" color="textSecondary" sx={{ mt: 2 }}>
-                  {tableData?.description}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
-                <StatusChip 
-                  label={tableData?.isPublic ? 'Публичная' : 'Приватная'} 
-                  status={tableData?.isPublic ? 'public' : 'private'}
-                  icon={tableData?.isPublic ? <PublicIcon /> : <LockIcon />}
-                  size="small"
-                />
-                {tableData?.user && (
-                  <Typography variant="body2" color="textSecondary" sx={{ ml: 2 }}>
-                    Автор: {tableData.user.name}
-                  </Typography>
-                )}
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
-                {isOwner && (
-                  <>
-                    <Button 
-                      variant="outlined" 
-                      color="primary"
-                      startIcon={<EditIcon />}
-                      onClick={() => navigate(`/edit-table/${id}`)}
-                      sx={{ borderRadius: '8px', textTransform: 'none' }}
-                    >
-                      Редактировать
-                    </Button>
-                    <Button 
-                      variant="outlined" 
-                      color="secondary"
-                      startIcon={<ShareIcon />}
-                      sx={{ borderRadius: '8px', textTransform: 'none' }}
-                    >
-                      Поделиться
-                    </Button>
-                  </>
-                )}
-                <Button 
-                  variant="outlined" 
-                  color="info"
-                  startIcon={<CalculateIcon />}
-                  onClick={() => navigate(`/results/${id}`)}
-                  sx={{ borderRadius: '8px', textTransform: 'none' }}
-                >
-                  Результаты
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
+      <PageHeader>
+        <Typography variant="h5" component="h1" fontWeight="bold">
+          {tableData?.name || 'Загрузка...'}
+        </Typography>
+        <Box>
+          <Button color="error" onClick={handleDeleteTable} sx={{ mr: 1 }}>Удалить таблицу</Button>
+          <Button color="primary" onClick={handleOpenModal}>Добавить объект</Button>
         </Box>
-      </motion.div>
-
-      <Divider sx={{ my: 3 }} />
+      </PageHeader>
       
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <motion.div variants={itemVariants}>
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={4}>
-              <InfoCard>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Критерии сравнения
-                  </Typography>
-                  <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
-                    {tableData?.columns?.length || 0}
-                  </Typography>
-                </CardContent>
-              </InfoCard>
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <InfoCard>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Объекты
-                  </Typography>
-                  <Typography variant="h4" color="secondary" sx={{ fontWeight: 'bold' }}>
-                    {tableData?.items?.length || 0}
-                  </Typography>
-                </CardContent>
-              </InfoCard>
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <InfoCard>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Лучший результат
-                  </Typography>
-                  {tableData?.items && tableData.items.length > 0 ? (
-                    <Typography variant="h4" color="success.main" sx={{ fontWeight: 'bold' }}>
-                      {Math.max(...tableData.items.map(item => item.utility || 0)).toFixed(2)}
-                    </Typography>
-                  ) : (
-                    <Typography variant="body1" color="text.secondary">
-                      Нет данных
-                    </Typography>
-                  )}
-                </CardContent>
-              </InfoCard>
-            </Grid>
-          </Grid>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Объекты сравнения
-            </Typography>
-            
-            {isOwner && (
-              <AddItemButton
-                variant="contained"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={handleOpenModal}
-              >
-                Добавить объект
-              </AddItemButton>
-            )}
-          </Box>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          {tableData?.items && tableData.items.length > 0 ? (
-            <StyledTableContainer component={Paper}>
-              <Table>
-                <StyledTableHead>
-                  <TableRow>
-                    <TableHeadCell>Название</TableHeadCell>
-                    <TableHeadCell>Стоимость</TableHeadCell>
+      <TableBox>
+        {loading ? (
+          <p>Загрузка данных...</p>
+        ) : (
+          <TableContainer sx={{ width: '100%', maxHeight: 'calc(100vh - 80px)' }}>
+            <Table size="small" stickyHeader sx={{ width: '100%' }}>
+              <TableHead>
+                <TableRow>
+                  <HeadCell>Название</HeadCell>
+                  <HeadCell>Стоимость</HeadCell>
+                  
+                  {/* Колонки характеристик и примечаний */}
+                  {tableData.columns?.map((col, idx) => (
+                    <React.Fragment key={idx}>
+                      <HeadCell>{col.name}</HeadCell>
+                      <HeadCell sx={{ 
+                        fontStyle: 'italic', 
+                        backgroundColor: alpha(theme.palette.warning.light, 0.05),
+                        minWidth: '150px'
+                      }}>
+                        Примечание
+                      </HeadCell>
+                    </React.Fragment>
+                  ))}
+                  
+                  <HeadCell align="right">Полезность</HeadCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tableData.items?.map((item) => (
+                  <TableRow key={item._id}>
+                    <StyledTableCell 
+                      editable={isOwner ? 'true' : 'false'}
+                      onClick={() => handleCellClick(item._id, 'name', item.name)}
+                    >
+                      {editingCell && editingCell.itemId === item._id && editingCell.field === 'name' ? (
+                        <TextField
+                          className="editing-cell"
+                          value={editValue}
+                          onChange={handleEditChange}
+                          onKeyDown={handleSaveEdit}
+                          autoFocus
+                          size="small"
+                          fullWidth
+                          variant="standard"
+                        />
+                      ) : (
+                        item.name
+                      )}
+                    </StyledTableCell>
+                    
+                    <StyledTableCell 
+                      editable={isOwner ? 'true' : 'false'}
+                      onClick={() => handleCellClick(item._id, 'cost', item.cost)}
+                    >
+                      {editingCell && editingCell.itemId === item._id && editingCell.field === 'cost' ? (
+                        <TextField
+                          className="editing-cell"
+                          value={editValue}
+                          onChange={handleEditChange}
+                          onKeyDown={handleSaveEdit}
+                          autoFocus
+                          size="small"
+                          type="number"
+                          variant="standard"
+                        />
+                      ) : (
+                        `${item.cost?.toFixed(2) || 0} ₽`
+                      )}
+                    </StyledTableCell>
+                    
                     {tableData.columns && tableData.columns.map(column => (
-                      <TableHeadCell 
-                        key={column._id}
-                        onMouseEnter={() => handleColumnMouseEnter(column._id)}
-                        onMouseLeave={handleColumnMouseLeave}
-                        onClick={() => isOwner && handleEditColumnDescription(column._id, column.description)}
-                        sx={{ 
-                          cursor: isOwner ? 'pointer' : 'default',
-                          position: 'relative',
-                          '&:hover::after': isOwner ? {
-                            content: '"✎"',
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            fontSize: '12px',
-                            opacity: 0.6
-                          } : {}
-                        }}
-                      >
-                        {column.name}
-                        {columnTooltip === column._id && (
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: '0',
-                              backgroundColor: 'white',
-                              boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-                              padding: '8px',
-                              borderRadius: '4px',
-                              zIndex: 999,
-                              minWidth: '150px',
-                              maxWidth: '300px'
-                            }}
-                          >
-                            {column.description ? (
-                              <Typography variant="body2">{column.description}</Typography>
-                            ) : (
-                              <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.7 }}>
-                                {isOwner ? 'Нажмите для добавления описания' : 'Нет описания'}
-                              </Typography>
-                            )}
-                          </Box>
-                        )}
-                      </TableHeadCell>
-                    ))}
-                    <TableHeadCell align="right">Полезность</TableHeadCell>
-                    <TableHeadCell align="center">Действия</TableHeadCell>
-                  </TableRow>
-                </StyledTableHead>
-                <TableBody>
-                  <AnimatePresence>
-                    {tableData.items.map((item, index) => (
-                      <motion.tr
-                        key={item._id}
-                        component={StyledTableRow}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                      >
-                        <StyledTableCell component="th" scope="row" 
-                          onClick={() => handleCellClick(item._id, 'name', item.name)}
-                          sx={{ cursor: isOwner ? 'pointer' : 'default' }}
+                      <React.Fragment key={column._id || column.name}>
+                        {/* Ячейка со значением характеристики */}
+                        <StyledTableCell 
+                          editable={isOwner ? 'true' : 'false'}
+                          onClick={() => handleCellClick(item._id, column.name, item.ratings && item.ratings[column.name])}
                         >
-                          {editingCell && editingCell.itemId === item._id && editingCell.field === 'name' ? (
-                            <TextField
-                              className="editing-cell"
-                              value={editValue}
-                              onChange={handleEditChange}
-                              onKeyDown={handleSaveEdit}
-                              autoFocus
-                              size="small"
-                              fullWidth
-                              InputProps={{ sx: { py: 0 } }}
-                            />
-                          ) : (
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {item.name}
-                            </Typography>
-                          )}
-                        </StyledTableCell>
-                        
-                        <StyledTableCell
-                          onClick={() => handleCellClick(item._id, 'cost', item.cost)}
-                          sx={{ cursor: isOwner ? 'pointer' : 'default' }}
-                        >
-                          {editingCell && editingCell.itemId === item._id && editingCell.field === 'cost' ? (
+                          {editingCell && editingCell.itemId === item._id && editingCell.field === column.name ? (
                             <TextField
                               className="editing-cell"
                               value={editValue}
@@ -994,202 +1109,161 @@ const TableView = () => {
                               autoFocus
                               size="small"
                               type="number"
-                              InputProps={{ 
-                                sx: { py: 0 },
-                                endAdornment: <span>₽</span>
-                              }}
+                              variant="standard"
                             />
                           ) : (
-                            <Typography variant="body2">
-                              {item.cost ? `${item.cost} ₽` : '-'}
-                            </Typography>
+                            (item.ratings && item.ratings[column.name] !== undefined) ? 
+                              item.ratings[column.name] : 
+                              '-'
                           )}
                         </StyledTableCell>
                         
-                        {tableData.columns.map(column => (
-                          <StyledTableCell 
-                            key={column._id}
-                            onClick={() => handleCellClick(item._id, column.name, item.ratings && item.ratings[column.name])}
-                            sx={{ cursor: isOwner ? 'pointer' : 'default' }}
-                          >
-                            {editingCell && editingCell.itemId === item._id && editingCell.field === column.name ? (
-                              <TextField
-                                className="editing-cell"
-                                value={editValue}
-                                onChange={handleEditChange}
-                                onKeyDown={handleSaveEdit}
-                                autoFocus
-                                size="small"
-                                type="number"
-                                InputProps={{ 
-                                  sx: { py: 0 },
-                                  inputProps: { min: 0, max: 10, step: 0.1 }
-                                }}
-                              />
-                            ) : (
-                              <Typography variant="body2">
-                                {item.ratings && item.ratings[column.name] !== undefined
-                                  ? item.ratings[column.name]
-                                  : '-'}
-                              </Typography>
-                            )}
-                          </StyledTableCell>
-                        ))}
-                        
-                        <StyledTableCell align="right">
-                          <Chip 
-                            label={getUtility(item)} 
-                            color="primary" 
-                            variant="outlined"
-                            size="small"
-                            sx={{ fontWeight: 'bold' }}
-                          />
-                        </StyledTableCell>
-                        
-                        <StyledTableCell align="center">
-                          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                            <Tooltip title="Просмотреть детали">
-                              <ActionButton
-                                size="small"
-                                color="info"
-                                onClick={() => navigate(`/object/${id}/${item._id}`)}
-                              >
-                                <VisibilityIcon fontSize="small" />
-                              </ActionButton>
-                            </Tooltip>
-                            
-                            {isOwner && (
-                              <>
-                                <Tooltip title="Редактировать">
-                                  <ActionButton
-                                    size="small"
-                                    color="primary"
-                                    onClick={() => handleEditObject(item._id)}
-                                  >
-                                    <EditIcon fontSize="small" />
-                                  </ActionButton>
-                                </Tooltip>
-                                
-                                <Tooltip title="Удалить">
-                                  <ActionButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleDeleteObject(item._id)}
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </ActionButton>
-                                </Tooltip>
-                              </>
-                            )}
-                          </Box>
-                        </StyledTableCell>
-                      </motion.tr>
+                        {/* Ячейка с примечанием к характеристике */}
+                        <NotesCell 
+                          editable={isOwner ? 'true' : 'false'}
+                          onClick={() => handleEditColumnNote(item._id, column._id || column.name, column.name)}
+                          sx={{ minWidth: '150px' }}
+                        >
+                          {editingCell && 
+                            editingCell.itemId === item._id && 
+                            editingCell.field === `note_${column.name}` ? (
+                            <TextField
+                              className="editing-cell"
+                              value={editValue}
+                              onChange={handleEditChange}
+                              onKeyDown={handleSaveEdit}
+                              autoFocus
+                              size="small"
+                              fullWidth
+                              variant="standard"
+                              multiline
+                              placeholder="Примечание..."
+                            />
+                          ) : (
+                            getColumnNote(item, column.name) || (isOwner ? 'Добавить...' : '-')
+                          )}
+                        </NotesCell>
+                      </React.Fragment>
                     ))}
-                  </AnimatePresence>
-                </TableBody>
-              </Table>
-            </StyledTableContainer>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                py: 8,
-                backgroundColor: alpha(theme.palette.primary.light, 0.05),
-                borderRadius: '12px',
-                mt: 3,
-                border: `1px dashed ${alpha(theme.palette.primary.main, 0.3)}`
-              }}
-            >
-              <AssessmentIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.3), mb: 2 }} />
-              <Typography variant="h6" color="textSecondary" gutterBottom>
-                Пока нет объектов для сравнения
-              </Typography>
-              <Typography variant="body2" color="textSecondary" textAlign="center" sx={{ maxWidth: 400, mb: 3 }}>
-                Добавьте объекты, которые хотите сравнить, и укажите их характеристики
+                    
+                    <StyledTableCell align="right">
+                      <Chip 
+                        label={getUtility(item)} 
+                        color="primary" 
+                        variant="outlined" 
+                        size="small"
+                      />
+                    </StyledTableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </TableBox>
+      
+      {modalOpen && (
+        <Backdrop 
+          open={true} 
+          sx={{ zIndex: 9999 }}
+          onClick={handleCloseModal}
+        >
+          <Box
+            sx={{
+              width: '100%',
+              maxWidth: 500,
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              p: 3,
+              boxShadow: 24
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h6" component="h2" gutterBottom>
+              Добавление нового объекта
+            </Typography>
+            
+            <form onSubmit={handleSubmit}>
+              <TextField
+                label="Название объекта"
+                name="name"
+                value={formData.name || ''}
+                onChange={handleInputChange}
+                fullWidth
+                margin="normal"
+                error={!!formErrors.name}
+                helperText={formErrors.name}
+              />
+              
+              <TextField
+                label="Стоимость"
+                name="cost"
+                type="number"
+                value={formData.cost || ''}
+                onChange={handleInputChange}
+                fullWidth
+                margin="normal"
+                error={!!formErrors.cost}
+                helperText={formErrors.cost || 'Укажите стоимость объекта'}
+                inputProps={{ min: 0 }}
+              />
+              
+              <TextField
+                label="Описание"
+                name="description"
+                value={formData.description || ''}
+                onChange={handleInputChange}
+                fullWidth
+                margin="normal"
+                multiline
+                rows={3}
+              />
+              
+              <TextField
+                label="Примечание"
+                name="note"
+                value={formData.note || ''}
+                onChange={handleInputChange}
+                fullWidth
+                margin="normal"
+                multiline
+                rows={2}
+              />
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" gutterBottom>
+                Оценки критериев:
               </Typography>
               
-              {isOwner && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<AddIcon />}
-                  onClick={handleOpenModal}
-                  sx={{ borderRadius: '8px', textTransform: 'none' }}
-                >
-                  Добавить первый объект
+              {tableData?.columns && tableData.columns.map(column => (
+                <TextField
+                  key={column._id}
+                  label={column.name}
+                  name={column._id}
+                  type="number"
+                  value={formData[column._id] || ''}
+                  onChange={handleInputChange}
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ min: 0, max: 10, step: 0.1 }}
+                  error={!!formErrors[column._id]}
+                  helperText={formErrors[column._id] || 'Оценка от 0 до 10'}
+                />
+              ))}
+              
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                <Button onClick={handleCloseModal} sx={{ mr: 1 }}>
+                  Отмена
                 </Button>
-              )}
-            </Box>
-          )}
-        </motion.div>
-      </motion.div>
-
-      {/* Упрощенный компонент модального окна */}
-      <SimpleModal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        title="Добавление нового объекта"
-      >
-        <form onSubmit={handleSubmit}>
-          <TextField
-            label="Название объекта"
-            name="name"
-            value={formData.name || ''}
-            onChange={handleInputChange}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.name}
-            helperText={formErrors.name}
-          />
-          
-          <TextField
-            label="Стоимость"
-            name="cost"
-            type="number"
-            value={formData.cost || ''}
-            onChange={handleInputChange}
-            fullWidth
-            margin="normal"
-            error={!!formErrors.cost}
-            helperText={formErrors.cost || 'Укажите стоимость объекта'}
-            inputProps={{ min: 0 }}
-          />
-          
-          <Divider sx={{ my: 2 }} />
-          
-          <Typography variant="subtitle1" gutterBottom>
-            Оценки критериев:
-          </Typography>
-          
-          {tableData?.columns && tableData.columns.map(column => (
-            <TextField
-              key={column._id}
-              label={column.name}
-              name={column._id}
-              type="number"
-              value={formData[column._id] || ''}
-              onChange={handleInputChange}
-              fullWidth
-              margin="normal"
-              inputProps={{ min: 0, max: 10, step: 0.1 }}
-              error={!!formErrors[column._id]}
-              helperText={formErrors[column._id] || 'Оценка от 0 до 10'}
-            />
-          ))}
-          
-          <SubmitButton 
-            type="submit" 
-            variant="contained" 
-            color="primary" 
-            fullWidth
-          >
-            Добавить объект
-          </SubmitButton>
-        </form>
-      </SimpleModal>
+                <Button type="submit" variant="contained" color="primary">
+                  Добавить
+                </Button>
+              </Box>
+            </form>
+          </Box>
+        </Backdrop>
+      )}
     </PageContainer>
   );
 };

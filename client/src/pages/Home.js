@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Typography, Box, Button, Grid, Paper } from '@mui/material';
+import { Container, Typography, Box, Button, Grid, Paper, useTheme } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { motion } from 'framer-motion';
+import { useInView } from 'react-intersection-observer';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PersonIcon from '@mui/icons-material/Person';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const FeatureItem = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -14,93 +19,399 @@ const FeatureItem = styled(Paper)(({ theme }) => ({
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    transform: 'translateY(-10px)',
+    boxShadow: '0 12px 20px rgba(0,0,0,0.1)'
+  }
+}));
+
+const StepCard = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  position: 'relative',
+  overflow: 'hidden',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '5px',
+    height: '100%',
+    background: theme.palette.primary.main,
+  }
+}));
+
+const StepNumber = styled(Box)(({ theme }) => ({
+  width: '40px',
+  height: '40px',
+  borderRadius: '50%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: theme.palette.primary.main,
+  color: 'white',
+  fontWeight: 'bold',
+  marginBottom: theme.spacing(2),
+}));
+
+const GradientButton = styled(Button)(({ theme }) => ({
+  background: 'linear-gradient(45deg, #3f51b5 30%, #7986cb 90%)',
+  color: 'white',
+  padding: '10px 25px',
+  boxShadow: '0 3px 5px 2px rgba(63, 81, 181, 0.3)',
+  '&:hover': {
+    background: 'linear-gradient(45deg, #2c387e 30%, #3f51b5 90%)',
+    boxShadow: '0 6px 10px 2px rgba(63, 81, 181, 0.3)',
+  }
+}));
+
+const HeroSection = styled(Box)(({ theme }) => ({
+  background: 'linear-gradient(135deg, #f5f7ff 0%, #e3e7ff 100%)',
+  borderRadius: '10px',
+  padding: theme.spacing(6, 3),
+  marginBottom: theme.spacing(6),
+  position: 'relative',
+  overflow: 'hidden',
+  boxShadow: '0 5px 20px rgba(0,0,0,0.05)',
+  [theme.breakpoints.up('md')]: {
+    padding: theme.spacing(8, 6),
+  }
 }));
 
 const Home = () => {
+  const theme = useTheme();
+  
+  const [featuresRef, featuresInView] = useInView({
+    triggerOnce: true,
+    threshold: 0.1,
+  });
+  
+  const [stepsRef, stepsInView] = useInView({
+    triggerOnce: true,
+    threshold: 0.1,
+  });
+  
+  // Анимационные варианты
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+  
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut"
+      }
+    }
+  };
+
   return (
-    <Container>
-      <Box sx={{ my: 4, textAlign: 'center' }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Chogrid - Помощник в принятии решений
-        </Typography>
-        <Typography variant="h5" component="h2" color="text.secondary" paragraph>
-          Интерактивные таблицы, которые помогут вам сделать правильный выбор при покупках
-        </Typography>
-        <Box sx={{ mt: 4 }}>
-          <Button
-            variant="contained"
-            size="large"
-            component={Link}
-            to="/register"
-            sx={{ mx: 1 }}
+    <Container maxWidth="lg">
+      <HeroSection component={motion.div}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+      >
+        <Grid container spacing={4} alignItems="center">
+          <Grid item xs={12} md={7}>
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <Typography variant="h3" component="h1" gutterBottom
+                sx={{ 
+                  fontWeight: 700, 
+                  color: theme.palette.primary.dark,
+                  mb: 3,
+                  position: 'relative',
+                  display: 'inline-block',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: '-8px',
+                    left: 0,
+                    width: '60px',
+                    height: '4px',
+                    backgroundColor: theme.palette.secondary.main,
+                  }
+                }}
+              >
+                Chogrid - Помощник в принятии решений
+              </Typography>
+              <Typography variant="h5" component="h2" 
+                sx={{ 
+                  fontWeight: 400, 
+                  color: 'text.secondary',
+                  mb: 4,
+                  maxWidth: '90%'
+                }}
+              >
+                Интерактивные таблицы, которые помогут вам сделать правильный выбор при покупках
+              </Typography>
+              <Box sx={{ mt: 5, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                <GradientButton
+                  component={Link}
+                  to="/register"
+                  size="large"
+                  variant="contained"
+                  endIcon={<ChevronRightIcon />}
+                >
+                  Начать бесплатно
+                </GradientButton>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  component={Link}
+                  to="/public-tables"
+                  sx={{ borderWidth: 2 }}
+                  endIcon={<VisibilityIcon />}
+                >
+                  Смотреть публичные таблицы
+                </Button>
+              </Box>
+            </motion.div>
+          </Grid>
+          <Grid item xs={12} md={5}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="float"
+            >
+              <Box 
+                component="img"
+                src="https://img.freepik.com/free-vector/data-analysis-illustration-flat-design_23-2148264553.jpg"
+                alt="Chogrid Illustration"
+                sx={{ 
+                  width: '100%',
+                  maxWidth: '400px',
+                  display: 'block',
+                  mx: 'auto',
+                  borderRadius: '10px',
+                  boxShadow: '0 15px 30px rgba(0,0,0,0.1)',
+                }}
+              />
+            </motion.div>
+          </Grid>
+        </Grid>
+      </HeroSection>
+
+      <Box sx={{ my: 8 }}>
+        <Box sx={{ textAlign: 'center', mb: 6 }}>
+          <Typography variant="overline" component="div" gutterBottom
+            sx={{ color: theme.palette.primary.main, fontWeight: 600, letterSpacing: 1.5 }}
           >
-            Начать бесплатно
-          </Button>
-          <Button
-            variant="outlined"
-            size="large"
-            component={Link}
-            to="/public-tables"
-            sx={{ mx: 1 }}
+            ВОЗМОЖНОСТИ
+          </Typography>
+          <Typography variant="h4" component="h2" gutterBottom
+            sx={{ fontWeight: 700, mb: 2 }}
           >
-            Смотреть публичные таблицы
-          </Button>
+            Что мы предлагаем
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+            Chogrid помогает сравнивать и оценивать различные варианты покупок по важным для вас критериям
+          </Typography>
         </Box>
+
+        <motion.div
+          ref={featuresRef}
+          variants={containerVariants}
+          initial="hidden"
+          animate={featuresInView ? "visible" : "hidden"}
+        >
+          <Grid container spacing={4}>
+            <Grid item xs={12} md={4}>
+              <motion.div variants={itemVariants}>
+                <FeatureItem elevation={3}>
+                  <Box sx={{ 
+                    p: 2, 
+                    backgroundColor: 'rgba(63, 81, 181, 0.1)', 
+                    borderRadius: '50%',
+                    mb: 2
+                  }}>
+                    <TableChartIcon 
+                      sx={{ fontSize: 48, color: theme.palette.primary.main }} 
+                    />
+                  </Box>
+                  <Typography variant="h5" component="h3" gutterBottom fontWeight={600}>
+                    Создавайте таблицы
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Добавляйте произвольные критерии оценки товаров и задавайте им веса важности
+                  </Typography>
+                </FeatureItem>
+              </motion.div>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <motion.div variants={itemVariants}>
+                <FeatureItem elevation={3}>
+                  <Box sx={{ 
+                    p: 2, 
+                    backgroundColor: 'rgba(63, 81, 181, 0.1)', 
+                    borderRadius: '50%',
+                    mb: 2
+                  }}>
+                    <CheckCircleIcon 
+                      sx={{ fontSize: 48, color: theme.palette.primary.main }} 
+                    />
+                  </Box>
+                  <Typography variant="h5" component="h3" gutterBottom fontWeight={600}>
+                    Автоматический расчет
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Система автоматически рассчитает полезность каждого товара на основе оценок и весов
+                  </Typography>
+                </FeatureItem>
+              </motion.div>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <motion.div variants={itemVariants}>
+                <FeatureItem elevation={3}>
+                  <Box sx={{ 
+                    p: 2, 
+                    backgroundColor: 'rgba(63, 81, 181, 0.1)', 
+                    borderRadius: '50%',
+                    mb: 2
+                  }}>
+                    <PersonIcon 
+                      sx={{ fontSize: 48, color: theme.palette.primary.main }} 
+                    />
+                  </Box>
+                  <Typography variant="h5" component="h3" gutterBottom fontWeight={600}>
+                    Публикуйте и делитесь
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Сделайте таблицу публичной, чтобы поделиться своими исследованиями с другими пользователями
+                  </Typography>
+                </FeatureItem>
+              </motion.div>
+            </Grid>
+          </Grid>
+        </motion.div>
       </Box>
 
-      <Grid container spacing={4} sx={{ my: 4 }}>
-        <Grid item xs={12} md={4}>
-          <FeatureItem elevation={3}>
-            <TableChartIcon color="primary" sx={{ fontSize: 60, mb: 2 }} />
-            <Typography variant="h5" component="h3" gutterBottom>
-              Создавайте таблицы
-            </Typography>
-            <Typography variant="body1">
-              Добавляйте произвольные критерии оценки товаров и задавайте им веса важности
-            </Typography>
-          </FeatureItem>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <FeatureItem elevation={3}>
-            <CheckCircleIcon color="primary" sx={{ fontSize: 60, mb: 2 }} />
-            <Typography variant="h5" component="h3" gutterBottom>
-              Автоматический расчет
-            </Typography>
-            <Typography variant="body1">
-              Система автоматически рассчитает полезность каждого товара на основе оценок и весов
-            </Typography>
-          </FeatureItem>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <FeatureItem elevation={3}>
-            <PersonIcon color="primary" sx={{ fontSize: 60, mb: 2 }} />
-            <Typography variant="h5" component="h3" gutterBottom>
-              Публикуйте и делитесь
-            </Typography>
-            <Typography variant="body1">
-              Сделайте таблицу публичной, чтобы поделиться своими исследованиями с другими пользователями
-            </Typography>
-          </FeatureItem>
-        </Grid>
-      </Grid>
+      <Box sx={{ my: 8, py: 6, backgroundColor: 'rgba(63, 81, 181, 0.05)', borderRadius: '10px' }}>
+        <Box sx={{ textAlign: 'center', mb: 6 }}>
+          <Typography variant="overline" component="div" gutterBottom
+            sx={{ color: theme.palette.primary.main, fontWeight: 600, letterSpacing: 1.5 }}
+          >
+            КАК ЭТО РАБОТАЕТ
+          </Typography>
+          <Typography variant="h4" component="h2" gutterBottom
+            sx={{ fontWeight: 700, mb: 2 }}
+          >
+            Просто. Понятно. Эффективно.
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+            Всего несколько шагов для принятия оптимального решения
+          </Typography>
+        </Box>
 
-      <Box sx={{ my: 6, textAlign: 'center' }}>
-        <Typography variant="h4" component="h2" gutterBottom>
-          Как это работает?
-        </Typography>
-        <Typography variant="body1" paragraph sx={{ maxWidth: 800, mx: 'auto' }}>
-          Создайте таблицу, добавьте критерии оценки и задайте им веса важности. Добавляйте товары и оценивайте их по каждому критерию. 
-          Chogrid автоматически рассчитает полезность каждого товара, помогая вам сделать оптимальный выбор.
-        </Typography>
-        <Button 
-          variant="contained" 
-          size="large" 
-          component={Link} 
-          to="/login"
-          sx={{ mt: 2 }}
+        <motion.div
+          ref={stepsRef}
+          variants={containerVariants}
+          initial="hidden"
+          animate={stepsInView ? "visible" : "hidden"}
         >
-          Войти и начать
-        </Button>
+          <Grid container spacing={4} sx={{ px: { xs: 2, md: 4 } }}>
+            <Grid item xs={12} md={4}>
+              <motion.div variants={itemVariants}>
+                <StepCard elevation={2}>
+                  <StepNumber>1</StepNumber>
+                  <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 600 }}>
+                    Создайте таблицу
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Задайте название таблицы и добавьте критерии оценки с указанием их важности
+                  </Typography>
+                </StepCard>
+              </motion.div>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <motion.div variants={itemVariants}>
+                <StepCard elevation={2}>
+                  <StepNumber>2</StepNumber>
+                  <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 600 }}>
+                    Добавьте объекты
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Внесите объекты для сравнения (товары, услуги) и оцените их по каждому критерию
+                  </Typography>
+                </StepCard>
+              </motion.div>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <motion.div variants={itemVariants}>
+                <StepCard elevation={2}>
+                  <StepNumber>3</StepNumber>
+                  <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 600 }}>
+                    Получите результат
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Chogrid автоматически рассчитает полезность и выделит оптимальный вариант для покупки
+                  </Typography>
+                </StepCard>
+              </motion.div>
+            </Grid>
+          </Grid>
+        </motion.div>
+        
+        <Box sx={{ textAlign: 'center', mt: 6 }}>
+          <GradientButton 
+            variant="contained" 
+            size="large" 
+            component={Link} 
+            to="/login"
+            startIcon={<AssessmentIcon />}
+          >
+            Начать использовать Chogrid
+          </GradientButton>
+        </Box>
+      </Box>
+      
+      <Box sx={{ my: 8, textAlign: 'center', py: 4 }}>
+        <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 700 }}>
+          Готовы сделать правильный выбор?
+        </Typography>
+        <Typography variant="body1" paragraph sx={{ maxWidth: 600, mx: 'auto', mb: 4, color: 'text.secondary' }}>
+          Присоединяйтесь к сообществу пользователей Chogrid и сделайте свои покупки более осознанными и выгодными.
+        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Button 
+            variant="contained" 
+            size="large" 
+            component={Link} 
+            to="/register"
+            color="primary"
+          >
+            Зарегистрироваться
+          </Button>
+          <Button 
+            variant="outlined" 
+            size="large" 
+            component={Link} 
+            to="/login"
+          >
+            Войти в аккаунт
+          </Button>
+        </Box>
       </Box>
     </Container>
   );

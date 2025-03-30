@@ -45,7 +45,15 @@ const EditTable = () => {
     try {
       setLoading(true);
       const response = await api.get(`/tables/${id}`);
-      const tableData = response.data.data;
+      
+      console.log('Ответ при загрузке таблицы:', response.data);
+      
+      const tableData = response.data.data || response.data;
+      
+      if (!tableData) {
+        throw new Error('Пустые данные таблицы');
+      }
+      
       setTable(tableData);
       setTableData({
         name: tableData.name,
@@ -121,8 +129,11 @@ const EditTable = () => {
 
     try {
       setSubmitting(true);
-      await api.put(`/tables/${id}`, tableData);
-      navigate(`/tables/${id}`);
+      const response = await api.put(`/tables/${id}`, tableData);
+      
+      console.log('Ответ при обновлении таблицы:', response.data);
+      
+      navigate(`/table/${id}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Ошибка при обновлении таблицы');
       console.error('Ошибка при обновлении таблицы:', err);
@@ -249,22 +260,21 @@ const EditTable = () => {
               </Typography>
             )}
 
-            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-              <Button
-                variant="outlined"
-                onClick={() => navigate(`/tables/${id}`)}
-                disabled={submitting}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+              <Button 
+                variant="outlined" 
+                color="secondary" 
+                onClick={() => navigate(`/table/${id}`)}
               >
                 Отмена
               </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary" 
                 disabled={submitting}
-                startIcon={submitting && <CircularProgress size={20} />}
               >
-                {submitting ? 'Сохранение...' : 'Сохранить изменения'}
+                {submitting ? <CircularProgress size={24} /> : 'Сохранить изменения'}
               </Button>
             </Box>
           </form>

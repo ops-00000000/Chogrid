@@ -92,7 +92,18 @@ const CreateTable = () => {
     try {
       setLoading(true);
       const response = await api.post('/tables', tableData);
-      navigate(`/tables/${response.data.data._id}`);
+      
+      console.log('Ответ при создании таблицы:', response.data);
+      
+      // Получаем ID созданной таблицы
+      const tableId = response.data.data?._id || response.data._id;
+      
+      if (!tableId) {
+        throw new Error('Не удалось получить ID созданной таблицы');
+      }
+      
+      // Исправлен путь с /tables/ на /table/
+      navigate(`/table/${tableId}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Ошибка при создании таблицы');
       console.error('Ошибка при создании таблицы:', err);

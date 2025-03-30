@@ -7,6 +7,11 @@ const CustomColumnSchema = new mongoose.Schema({
     required: [true, 'Пожалуйста, укажите название колонки'],
     trim: true
   },
+  description: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   weight: {
     type: Number,
     required: [true, 'Пожалуйста, укажите вес колонки'],

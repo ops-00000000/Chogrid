@@ -266,6 +266,13 @@ const TableView = () => {
   const [formData, setFormData] = useState({});
   const [formErrors, setFormErrors] = useState({});
   
+  // Добавляю новые состояния для редактирования
+  const [editingCell, setEditingCell] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  
+  // Добавляю состояние для отображения описания колонки при наведении
+  const [columnTooltip, setColumnTooltip] = useState(null);
+  
   // Отслеживание состояния модального окна
   useEffect(() => {
     console.log('Текущее состояние modalOpen:', modalOpen);
@@ -563,6 +570,145 @@ const TableView = () => {
     }
   };
 
+  // Функция для обработки начала редактирования ячейки
+  const handleCellClick = (itemId, field, currentValue) => {
+    // Если пользователь не владелец, не разрешаем редактирование
+    if (!isOwner) return;
+    
+    // Устанавливаем editingCell в формате {itemId, field}
+    setEditingCell({itemId, field});
+    // Устанавливаем значение для редактирования
+    setEditValue(currentValue !== undefined ? currentValue.toString() : '');
+  };
+
+  // Функция для обработки изменения значения при редактировании
+  const handleEditChange = (e) => {
+    setEditValue(e.target.value);
+  };
+
+  // Функция для сохранения измененного значения
+  const handleSaveEdit = async (e) => {
+    if (e.key === 'Enter' && editingCell) {
+      // Добавляем проверку на наличие метода preventDefault
+      if (e.preventDefault && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+      
+      try {
+        const {itemId, field} = editingCell;
+        let updatedValue = editValue;
+        
+        // Преобразуем значение в число для числовых полей
+        if (field !== 'name') {
+          updatedValue = parseFloat(editValue);
+          if (isNaN(updatedValue)) {
+            toast.error('Введите корректное число');
+            return;
+          }
+        }
+        
+        // Подготавливаем данные для обновления
+        let updateData = {};
+        
+        // Обрабатываем разные типы полей
+        if (field === 'name' || field === 'cost') {
+          // Прямые поля объекта
+          updateData[field] = updatedValue;
+        } else {
+          // Рейтинги колонок
+          updateData.ratings = {};
+          updateData.ratings[field] = updatedValue;
+        }
+        
+        // Отправляем запрос на обновление, используем PUT вместо PATCH
+        await axios.put(`${BASE_URL}/api/tables/${id}/items/${itemId}`, updateData);
+        
+        // Обновляем данные таблицы
+        await fetchTable();
+        
+        // Сбрасываем состояние редактирования
+        setEditingCell(null);
+        
+        toast.success('Значение обновлено');
+      } catch (err) {
+        console.error('Error updating item:', err);
+        toast.error('Ошибка при обновлении значения');
+      }
+    } else if (e.key === 'Escape') {
+      // Отменяем редактирование при нажатии Escape
+      setEditingCell(null);
+    }
+  };
+
+  // Обработчик клика вне области редактирования для сохранения значения
+  const handleClickOutside = (e) => {
+    if (editingCell && !e.target.closest('.editing-cell')) {
+      // Передаем объект с ключом, но без preventDefault
+      handleSaveEdit({ key: 'Enter' });
+    }
+  };
+
+  // Добавляем эффект для обработки клика вне поля редактирования
+  useEffect(() => {
+    if (editingCell) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [editingCell]);
+
+  // Функция для отображения всплывающей подсказки с описанием колонки
+  const handleColumnMouseEnter = (columnId) => {
+    setColumnTooltip(columnId);
+  };
+
+  const handleColumnMouseLeave = () => {
+    setColumnTooltip(null);
+  };
+
+  // Функция для редактирования описания колонки
+  const handleEditColumnDescription = async (columnId, currentDescription = '') => {
+    if (!isOwner) return;
+    
+    // Запрашиваем новое описание у пользователя через диалог
+    const newDescription = prompt('Введите описание колонки:', currentDescription);
+    
+    // Если пользователь отменил ввод или ничего не изменил, выходим
+    if (newDescription === null || newDescription === currentDescription) return;
+    
+    try {
+      // Находим индекс колонки в массиве
+      const columnIndex = tableData.columns.findIndex(col => col._id === columnId);
+      if (columnIndex === -1) return;
+      
+      // Создаем копию массива колонок
+      const updatedColumns = [...tableData.columns];
+      
+      // Обновляем описание в копии
+      updatedColumns[columnIndex] = {
+        ...updatedColumns[columnIndex],
+        description: newDescription
+      };
+      
+      // Отправляем запрос на обновление таблицы
+      await axios.put(`${BASE_URL}/api/tables/${id}`, {
+        columns: updatedColumns
+      });
+      
+      // Обновляем данные таблицы
+      await fetchTable();
+      
+      toast.success('Описание колонки обновлено');
+    } catch (err) {
+      console.error('Error updating column description:', err);
+      toast.error('Ошибка при обновлении описания колонки');
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ 
@@ -751,9 +897,51 @@ const TableView = () => {
                 <StyledTableHead>
                   <TableRow>
                     <TableHeadCell>Название</TableHeadCell>
+                    <TableHeadCell>Стоимость</TableHeadCell>
                     {tableData.columns && tableData.columns.map(column => (
-                      <TableHeadCell key={column._id}>
+                      <TableHeadCell 
+                        key={column._id}
+                        onMouseEnter={() => handleColumnMouseEnter(column._id)}
+                        onMouseLeave={handleColumnMouseLeave}
+                        onClick={() => isOwner && handleEditColumnDescription(column._id, column.description)}
+                        sx={{ 
+                          cursor: isOwner ? 'pointer' : 'default',
+                          position: 'relative',
+                          '&:hover::after': isOwner ? {
+                            content: '"✎"',
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            fontSize: '12px',
+                            opacity: 0.6
+                          } : {}
+                        }}
+                      >
                         {column.name}
+                        {columnTooltip === column._id && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '0',
+                              backgroundColor: 'white',
+                              boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                              padding: '8px',
+                              borderRadius: '4px',
+                              zIndex: 999,
+                              minWidth: '150px',
+                              maxWidth: '300px'
+                            }}
+                          >
+                            {column.description ? (
+                              <Typography variant="body2">{column.description}</Typography>
+                            ) : (
+                              <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.7 }}>
+                                {isOwner ? 'Нажмите для добавления описания' : 'Нет описания'}
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
                       </TableHeadCell>
                     ))}
                     <TableHeadCell align="right">Полезность</TableHeadCell>
@@ -771,17 +959,80 @@ const TableView = () => {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.3, delay: index * 0.05 }}
                       >
-                        <StyledTableCell component="th" scope="row">
-                          <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                            {item.name}
-                          </Typography>
+                        <StyledTableCell component="th" scope="row" 
+                          onClick={() => handleCellClick(item._id, 'name', item.name)}
+                          sx={{ cursor: isOwner ? 'pointer' : 'default' }}
+                        >
+                          {editingCell && editingCell.itemId === item._id && editingCell.field === 'name' ? (
+                            <TextField
+                              className="editing-cell"
+                              value={editValue}
+                              onChange={handleEditChange}
+                              onKeyDown={handleSaveEdit}
+                              autoFocus
+                              size="small"
+                              fullWidth
+                              InputProps={{ sx: { py: 0 } }}
+                            />
+                          ) : (
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {item.name}
+                            </Typography>
+                          )}
+                        </StyledTableCell>
+                        
+                        <StyledTableCell
+                          onClick={() => handleCellClick(item._id, 'cost', item.cost)}
+                          sx={{ cursor: isOwner ? 'pointer' : 'default' }}
+                        >
+                          {editingCell && editingCell.itemId === item._id && editingCell.field === 'cost' ? (
+                            <TextField
+                              className="editing-cell"
+                              value={editValue}
+                              onChange={handleEditChange}
+                              onKeyDown={handleSaveEdit}
+                              autoFocus
+                              size="small"
+                              type="number"
+                              InputProps={{ 
+                                sx: { py: 0 },
+                                endAdornment: <span>₽</span>
+                              }}
+                            />
+                          ) : (
+                            <Typography variant="body2">
+                              {item.cost ? `${item.cost} ₽` : '-'}
+                            </Typography>
+                          )}
                         </StyledTableCell>
                         
                         {tableData.columns.map(column => (
-                          <StyledTableCell key={column._id}>
-                            {item.ratings && item.ratings[column.name] !== undefined
-                              ? item.ratings[column.name]
-                              : '-'}
+                          <StyledTableCell 
+                            key={column._id}
+                            onClick={() => handleCellClick(item._id, column.name, item.ratings && item.ratings[column.name])}
+                            sx={{ cursor: isOwner ? 'pointer' : 'default' }}
+                          >
+                            {editingCell && editingCell.itemId === item._id && editingCell.field === column.name ? (
+                              <TextField
+                                className="editing-cell"
+                                value={editValue}
+                                onChange={handleEditChange}
+                                onKeyDown={handleSaveEdit}
+                                autoFocus
+                                size="small"
+                                type="number"
+                                InputProps={{ 
+                                  sx: { py: 0 },
+                                  inputProps: { min: 0, max: 10, step: 0.1 }
+                                }}
+                              />
+                            ) : (
+                              <Typography variant="body2">
+                                {item.ratings && item.ratings[column.name] !== undefined
+                                  ? item.ratings[column.name]
+                                  : '-'}
+                              </Typography>
+                            )}
                           </StyledTableCell>
                         ))}
                         

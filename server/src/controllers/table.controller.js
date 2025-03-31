@@ -1,4 +1,5 @@
 const Table = require('../models/Table');
+const mongoose = require('mongoose');
 
 // @desc    Создание новой таблицы
 // @route   POST /api/tables
@@ -157,33 +158,44 @@ exports.updateTable = async (req, res) => {
 // @access  Private
 exports.deleteTable = async (req, res) => {
   try {
-    const table = await Table.findById(req.params.id);
-
-    if (!table) {
+    // Проверяем валидность ID
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(404).json({
         success: false,
         message: 'Таблица не найдена'
       });
     }
 
-    // Проверка владельца
-    if (table.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
+    const table = await Table.findById(req.params.id);
+    
+    if (!table) {
+      return res.status(404).json({
         success: false,
-        message: 'Нет доступа к удалению этой таблицы'
+        message: 'Таблица не найдена'
       });
     }
-
-    await table.remove();
-
-    res.status(200).json({
+    
+    // Проверяем права доступа
+    if (table.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Нет прав на удаление таблицы'
+      });
+    }
+    
+    // Используем deleteOne вместо remove
+    await Table.deleteOne({ _id: req.params.id });
+    
+    res.json({
       success: true,
+      message: 'Таблица удалена',
       data: {}
     });
   } catch (error) {
+    console.error('Ошибка при удалении таблицы:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: 'Ошибка при удалении таблицы'
     });
   }
 };

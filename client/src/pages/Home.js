@@ -60,8 +60,11 @@ const StepNumber = styled(Box)(({ theme }) => ({
 const GradientButton = styled(Button)(({ theme }) => ({
   background: 'linear-gradient(45deg, #3f51b5 30%, #7986cb 90%)',
   color: 'white',
-  padding: '10px 25px',
+  padding: '12px 30px',
   boxShadow: '0 3px 5px 2px rgba(63, 81, 181, 0.3)',
+  borderRadius: '50px',
+  textTransform: 'none',
+  fontWeight: 600,
   '&:hover': {
     background: 'linear-gradient(45deg, #2c387e 30%, #3f51b5 90%)',
     boxShadow: '0 6px 10px 2px rgba(63, 81, 181, 0.3)',
@@ -69,13 +72,14 @@ const GradientButton = styled(Button)(({ theme }) => ({
 }));
 
 const HeroSection = styled(Box)(({ theme }) => ({
-  background: 'linear-gradient(135deg, #f5f7ff 0%, #e3e7ff 100%)',
-  borderRadius: '10px',
+  background: 'linear-gradient(135deg, #ffffff 0%, #f5f7ff 100%)',
+  borderRadius: '20px',
   padding: theme.spacing(6, 3),
   marginBottom: theme.spacing(6),
   position: 'relative',
   overflow: 'hidden',
-  boxShadow: '0 5px 20px rgba(0,0,0,0.05)',
+  boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+  border: '1px solid rgba(0,0,0,0.05)',
   [theme.breakpoints.up('md')]: {
     padding: theme.spacing(8, 6),
   }
@@ -125,7 +129,7 @@ const Home = () => {
         transition={{ duration: 0.8 }}
       >
         <Grid container spacing={4} alignItems="center">
-          <Grid item xs={12} md={7}>
+          <Grid item xs={12}>
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
@@ -138,14 +142,18 @@ const Home = () => {
                   mb: 3,
                   position: 'relative',
                   display: 'inline-block',
+                  textAlign: 'center',
+                  width: '100%',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
                     bottom: '-8px',
-                    left: 0,
-                    width: '60px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '100px',
                     height: '4px',
-                    backgroundColor: theme.palette.secondary.main,
+                    backgroundColor: theme.palette.primary.main,
+                    borderRadius: '2px',
                   }
                 }}
               >
@@ -156,12 +164,21 @@ const Home = () => {
                   fontWeight: 400, 
                   color: 'text.secondary',
                   mb: 4,
-                  maxWidth: '90%'
+                  textAlign: 'center',
+                  maxWidth: '800px',
+                  mx: 'auto',
+                  lineHeight: 1.6
                 }}
               >
                 Интерактивные таблицы, которые помогут вам сделать правильный выбор при покупках
               </Typography>
-              <Box sx={{ mt: 5, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ 
+                mt: 5, 
+                display: 'flex', 
+                justifyContent: 'center',
+                flexWrap: 'wrap', 
+                gap: 3 
+              }}>
                 <GradientButton
                   component={Link}
                   to="/register"
@@ -176,34 +193,18 @@ const Home = () => {
                   size="large"
                   component={Link}
                   to="/public-tables"
-                  sx={{ borderWidth: 2 }}
+                  sx={{ 
+                    borderWidth: 2,
+                    borderRadius: '50px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    px: 4
+                  }}
                   endIcon={<VisibilityIcon />}
                 >
                   Смотреть публичные таблицы
                 </Button>
               </Box>
-            </motion.div>
-          </Grid>
-          <Grid item xs={12} md={5}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="float"
-            >
-              <Box 
-                component="img"
-                src="https://img.freepik.com/free-vector/data-analysis-illustration-flat-design_23-2148264553.jpg"
-                alt="Chogrid Illustration"
-                sx={{ 
-                  width: '100%',
-                  maxWidth: '400px',
-                  display: 'block',
-                  mx: 'auto',
-                  borderRadius: '10px',
-                  boxShadow: '0 15px 30px rgba(0,0,0,0.1)',
-                }}
-              />
             </motion.div>
           </Grid>
         </Grid>

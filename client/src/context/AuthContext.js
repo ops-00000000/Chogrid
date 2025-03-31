@@ -27,9 +27,9 @@ export const AuthProvider = ({ children }) => {
           const res = await axios.get(`${BASE_URL}/api/auth/me`);
           console.log('Данные пользователя:', res.data);
           
-          if (res.data) {
-            // Проверяем наличие ID и обеспечиваем его доступность через свойство _id для совместимости
-            let userData = res.data;
+          if (res.data && res.data.data) {
+            // Используем данные из res.data.data
+            let userData = res.data.data;
             
             // Обеспечиваем наличие _id, если имеется только id
             if (userData.id && !userData._id) {

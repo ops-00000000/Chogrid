@@ -17,7 +17,8 @@
     "react-router-dom": "^6.19.0",
     "react-scripts": "5.0.1",
     "react-table": "^7.8.0",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "styled-components": "^6.1.16"
   },
   "scripts": {
     "start": "react-scripts start",

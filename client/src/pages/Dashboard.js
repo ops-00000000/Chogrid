@@ -30,6 +30,7 @@ const PageTitle = styled(Typography)(({ theme }) => ({
   fontWeight: 700,
   position: 'relative',
   display: 'inline-block',
+  color: theme.palette.primary.dark,
   '&::after': {
     content: '""',
     position: 'absolute',
@@ -39,6 +40,7 @@ const PageTitle = styled(Typography)(({ theme }) => ({
     left: '0',
     borderRadius: '2px',
     backgroundColor: theme.palette.primary.main,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   }
 }));
 
@@ -136,16 +138,41 @@ const Dashboard = () => {
     navigate(`/edit-table/${id}`);
   };
   
-  const handleDeleteTable = async (id, e) => {
-    e.stopPropagation();
-    
+  const handleDeleteTable = async (tableId) => {
     if (window.confirm('Вы уверены, что хотите удалить эту таблицу?')) {
       try {
-        await axios.delete(`${BASE_URL}/api/tables/${id}`);
-        setTables(tables.filter(table => table._id !== id));
-        toast.success('Таблица успешно удалена');
+        console.log('Начинаем удаление таблицы с ID:', tableId);
+        
+        // Получаем токен аутентификации
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Ошибка авторизации. Пожалуйста, войдите заново');
+          navigate('/login');
+          return;
+        }
+        
+        // Настраиваем заголовки для запроса
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+        
+        // Удаляем таблицу
+        await axios.delete(`${BASE_URL}/api/tables/${tableId}`, { headers });
+        
+        toast.success('Таблица успешно удалена!');
+        // Обновляем список таблиц
+        fetchTables();
+        
       } catch (err) {
-        console.error('Error deleting table:', err);
+        console.error('Ошибка при удалении таблицы:', err);
+        
+        // Детальное логирование ошибки для отладки
+        if (err.response) {
+          console.error('Статус ошибки:', err.response.status);
+          console.error('Данные ошибки:', err.response.data);
+        }
+        
         toast.error('Ошибка при удалении таблицы');
       }
     }
@@ -299,7 +326,7 @@ const Dashboard = () => {
                         <IconButton 
                           size="small" 
                           color="error"
-                          onClick={(e) => handleDeleteTable(table._id, e)}
+                          onClick={() => handleDeleteTable(table._id)}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>

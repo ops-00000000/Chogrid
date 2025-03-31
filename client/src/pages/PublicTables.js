@@ -36,6 +36,7 @@ const PageTitle = styled(Typography)(({ theme }) => ({
   fontWeight: 700,
   position: 'relative',
   display: 'inline-block',
+  color: theme.palette.primary.dark,
   '&::after': {
     content: '""',
     position: 'absolute',
@@ -45,6 +46,7 @@ const PageTitle = styled(Typography)(({ theme }) => ({
     left: '0',
     borderRadius: '2px',
     backgroundColor: theme.palette.primary.main,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   }
 }));
 

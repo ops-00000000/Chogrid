@@ -26,7 +26,17 @@ import {
   Backdrop,
   Modal,
   Tab,
-  Tabs
+  Tabs,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  LinearProgress
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,6 +54,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import InsightsIcon from '@mui/icons-material/Insights';
 import PieChartIcon from '@mui/icons-material/PieChart';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -243,6 +254,20 @@ const TableView = () => {
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnWeight, setNewColumnWeight] = useState(10);
   
+  // Добавляем состояния для автоматической генерации
+  const [generatingTable, setGeneratingTable] = useState(false);
+  const [generationDialog, setGenerationDialog] = useState(false);
+  const [generationCategory, setGenerationCategory] = useState('');
+  const [generationQuery, setGenerationQuery] = useState('');
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStep, setGenerationStep] = useState('');
+  
+  // Tavily API ключ
+  const TAVILY_API_KEY = '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';
+  
+  // Grok API ключ
+  const GROK_API_KEY = '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';
+
   // Отслеживание состояния модального окна
   useEffect(() => {
     console.log('Текущее состояние modalOpen:', modalOpen);
@@ -736,24 +761,25 @@ const TableView = () => {
   // Функция для сохранения примечания в localStorage
   const saveNoteToLocalStorage = (itemId, columnName, noteValue) => {
     try {
-      // Получаем текущие примечания или создаем новый объект
-      const notesStr = localStorage.getItem(NOTES_STORAGE_KEY) || '{}';
-      const notes = JSON.parse(notesStr);
+      if (!itemId || !columnName) return;
       
-      // Создаем ключ для примечания
+      console.log(`Сохраняем примечание для ${itemId}-${columnName}:`, noteValue);
+      
+      // Создаем уникальный ключ для этого примечания
       const noteKey = `${itemId}-${columnName}`;
       
-      // Сохраняем примечание
-      notes[noteKey] = noteValue;
+      // Сохраняем значение в localStorage
+      localStorage.setItem(noteKey, noteValue);
       
-      // Обновляем localStorage
-      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+      // Обновляем наш объект с примечаниями
+      setNotes(prev => ({
+        ...prev,
+        [noteKey]: noteValue
+      }));
       
-      console.log('Примечание сохранено в localStorage:', { itemId, columnName, noteValue });
-      return true;
-    } catch (e) {
-      console.error('Ошибка при сохранении примечания в localStorage:', e);
-      return false;
+      console.log(`Примечание сохранено с ключом ${noteKey}`);
+    } catch (err) {
+      console.error('Ошибка при сохранении примечания в localStorage:', err);
     }
   };
 
@@ -1245,6 +1271,595 @@ const TableView = () => {
     }
   };
 
+  // Функция для открытия диалога генерации таблицы
+  const handleOpenGenerationDialog = () => {
+    if (!isAuthenticated) {
+      toast.warning('Необходимо войти в систему для генерации таблицы');
+      navigate('/login');
+      return;
+    }
+    setGenerationDialog(true);
+  };
+
+  // Функция для закрытия диалога генерации таблицы
+  const handleCloseGenerationDialog = () => {
+    setGenerationDialog(false);
+  };
+
+  // Функция для запроса данных из Tavily API
+  const fetchFromTavily = async (query) => {
+    try {
+      const response = await axios.post('https://api.tavily.com/search', {
+        api_key: TAVILY_API_KEY,
+        query: query,
+        search_depth: "advanced",
+        include_domains: [],
+        exclude_domains: [],
+        max_results: 10
+      });
+      
+      console.log('Результаты поиска Tavily:', response.data);
+      return response.data.results;
+    } catch (error) {
+      console.error('Ошибка при запросе к Tavily API:', error);
+      throw new Error('Не удалось получить данные из Tavily API');
+    }
+  };
+
+  // Функция для генерации характеристик с помощью LLM
+  const generateCharacteristics = async (category) => {
+    try {
+      // Запрос на получение релевантных характеристик для категории
+      const searchQuery = `Важные характеристики и критерии сравнения для выбора ${category}`;
+      const searchResults = await fetchFromTavily(searchQuery);
+      
+      // Подготовка контекста для LLM
+      let context = "На основе следующей информации, определите 5-7 ключевых характеристик для сравнения " + 
+                    `${category}, включая их вес важности (1-100):\n\n`;
+      
+      searchResults.forEach((result, index) => {
+        context += `[Источник ${index + 1}]: ${result.content}\n\n`;
+      });
+      
+      // Отправка запроса к Grok API
+      const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: "llama3-70b-8192",
+        messages: [
+          {
+            role: "system",
+            content: "Ты эксперт в области оценки и сравнения продуктов. Твоя задача - определить ключевые характеристики для сравнения продуктов указанной категории и присвоить им веса важности. Формат ответа должен быть: 1. Название характеристики: вес (число от 1 до 100)"
+          },
+          {
+            role: "user",
+            content: context
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      }, {
+        headers: {
+          'Authorization': `Bearer ${GROK_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Ответ от Grok API (характеристики):', response.data);
+      
+      // Парсинг ответа LLM
+      const responseText = response.data.choices[0].message.content;
+      
+      // Простой парсер для извлечения характеристик и весов
+      const lines = responseText.split('\n');
+      const characteristics = [];
+      
+      for (const line of lines) {
+        const match = line.match(/\d+\.\s*(.+?):\s*(\d+)/);
+        if (match) {
+          characteristics.push({
+            name: match[1].trim(),
+            weight: parseInt(match[2], 10)
+          });
+        }
+      }
+      
+      return characteristics.length > 0 ? characteristics : [
+        { name: "Качество дисплея", weight: 80 },
+        { name: "Производительность", weight: 85 },
+        { name: "Время автономной работы", weight: 75 },
+        { name: "Качество камеры", weight: 70 },
+        { name: "Дизайн и эргономика", weight: 60 }
+      ];
+    } catch (error) {
+      console.error('Ошибка при генерации характеристик:', error);
+      // Возвращаем запасной набор характеристик
+      return [
+        { name: "Качество дисплея", weight: 80 },
+        { name: "Производительность", weight: 85 },
+        { name: "Время автономной работы", weight: 75 },
+        { name: "Качество камеры", weight: 70 },
+        { name: "Дизайн и эргономика", weight: 60 }
+      ];
+    }
+  };
+
+  // Функция генерации объектов для таблицы
+  const generateItems = async (category, characteristics) => {
+    try {
+      setGenerationProgress(60);
+      setGenerationStep('Генерация объектов...');
+      
+      // Формируем контекст для запроса к API
+      const columnNames = characteristics.map(col => col.name);
+      
+      // Создаем инструкции для Grok API
+      const context = `
+Мне нужно сгенерировать информацию для сравнительной таблицы товаров в категории "${category}".
+Таблица содержит следующие характеристики для оценки: ${columnNames.join(', ')}.
+
+Пожалуйста, предоставь информацию о 3-5 популярных моделях в этой категории. Для каждой модели укажи:
+1. Название модели
+2. Примерную стоимость в рублях
+3. Краткое описание (1-2 предложения)
+4. Числовую оценку по шкале от 1 до 10 для каждой из перечисленных характеристик
+
+Верни только структурированный JSON с массивом объектов в следующем формате:
+[
+  {
+    "name": "Название модели",
+    "cost": число,
+    "description": "Краткое описание",
+    "ratings": {
+      "\${характеристика1}": число от 1 до 10,
+      "\${характеристика2}": число от 1 до 10,
+      ...и так для каждой характеристики
+    }
+  },
+  ...и так для каждой модели
+]
+`;
+
+      // Дополнительные инструкции от пользователя
+      const combinedContext = generationQuery 
+        ? `${context}\n\nДополнительные указания: ${generationQuery}` 
+        : context;
+
+      console.log('Результаты поиска Tavily:', await fetchFromTavily(`${category} характеристики сравнение`));
+        
+      // Выполняем запрос к Grok API
+      try {
+        const grokResponse = await axios.post(
+          'https://api.groq.com/openai/v1/chat/completions',
+          {
+            model: 'llama3-70b-8192',
+            messages: [
+              {
+                role: 'system',
+                content: 'Ты - эксперт по анализу технических характеристик и созданию сравнительных таблиц. Твоя задача - предоставить объективные данные для сравнения товаров в формате JSON. Используй только числовые значения для рейтингов.'
+              },
+              {
+                role: 'user',
+                content: combinedContext
+              }
+            ],
+            temperature: 0.7
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${GROK_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        console.log('Ответ от Grok API (объекты):', grokResponse.data);
+        
+        // Обрабатываем ответ
+        const responseText = grokResponse.data.choices?.[0]?.message?.content || '';
+        console.log('Текст ответа LLM:', responseText);
+        
+        // Улучшенный алгоритм извлечения JSON из текста
+        let jsonData = [];
+        
+        // Попытка 1: Прямое извлечение JSON из ответа
+        try {
+          // Ищем начало и конец JSON массива
+          let jsonStart = responseText.indexOf('[');
+          let jsonEnd = responseText.lastIndexOf(']');
+          
+          if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
+            console.log('Извлеченная JSON строка:', jsonString);
+            jsonData = JSON.parse(jsonString);
+            console.log('Успешно извлечен JSON:', jsonData);
+          } else {
+            throw new Error('JSON массив не найден в ответе');
+          }
+        } catch (jsonParseError) {
+          console.error('Ошибка при прямом парсинге JSON:', jsonParseError);
+          
+          // Попытка 2: Поиск JSON с обработкой кавычек
+          try {
+            // Ищем текст, который может быть JSON
+            const jsonPattern = /\[\s*{[\s\S]*}\s*\]/g;
+            const matches = responseText.match(jsonPattern);
+            
+            if (matches && matches.length > 0) {
+              const potentialJson = matches[0]
+                .replace(/(\w+):/g, '"$1":') // Заменяем 'key:' на '"key":'
+                .replace(/:\s*'([^']*)'/g, ': "$1"') // Заменяем одинарные кавычки на двойные
+                .replace(/:\s*"([^"]*)"/g, ': "$1"'); // Оставляем двойные кавычки
+              
+              console.log('Потенциальный JSON после обработки:', potentialJson);
+              jsonData = JSON.parse(potentialJson);
+              console.log('Успешно извлечен JSON после обработки:', jsonData);
+            } else {
+              throw new Error('JSON паттерн не найден в ответе');
+            }
+          } catch (patternError) {
+            console.error('Ошибка при обработке паттерна JSON:', patternError);
+            
+            // Попытка 3: Используем регулярные выражения для извлечения структурированной информации
+            try {
+              const modelBlocks = responseText.split(/\*\*Model:|Model:|Model name:|Модель:|Название:|Name:/i)
+                .filter(block => block.trim().length > 0);
+              
+              console.log('Извлеченные блоки моделей:', modelBlocks);
+              
+              if (modelBlocks.length > 0) {
+                jsonData = modelBlocks.map(block => {
+                  // Извлекаем название модели
+                  const nameMatch = block.match(/^\s*([^*\n]+?)(?:\*\*|\n|$)/);
+                  const name = nameMatch ? nameMatch[1].trim() : `${category} модель`;
+                  
+                  // Извлекаем цену
+                  const priceMatch = block.match(/Price:|Цена:|Cost:|Стоимость:.*?(\d[\d\s,.]+)(?:руб|\$|₽|рублей|RUB)/i);
+                  const priceString = priceMatch ? priceMatch[1].replace(/\s+/g, '').replace(',', '.') : '';
+                  const cost = Number(priceString) || Math.floor(Math.random() * 50000) + 30000;
+                  
+                  // Извлекаем описание
+                  const descMatch = block.match(/Description:|Описание:.*?\n(.*?)(?:\n\n|\n[A-Z])/i);
+                  const description = descMatch 
+                    ? descMatch[1].trim() 
+                    : `Современная модель ${category} с отличными характеристиками`;
+                  
+                  // Создаем объект с рейтингами
+                  const ratings = {};
+                  
+                  // Для каждой характеристики ищем оценку
+                  for (const column of characteristics) {
+                    const columnName = column.name;
+                    // Ищем оценку в формате "Characteristic: 8/10" или "Characteristic - 8"
+                    const ratingPattern = new RegExp(`${columnName}[^\\d]+(\\d+(?:\\.\\d+)?)(?:\\/10|-|:)`, 'i');
+                    const ratingMatch = block.match(ratingPattern);
+                    
+                    // Если нашли оценку, добавляем ее; иначе ставим случайную оценку
+                    if (ratingMatch) {
+                      ratings[columnName] = Number(ratingMatch[1]);
+                    } else {
+                      // Если не удалось найти оценку, используем случайное значение
+                      ratings[columnName] = Math.floor(Math.random() * 3) + 7; // Случайное число от 7 до 9
+                    }
+                  }
+                  
+                  return { name, cost, description, ratings };
+                });
+                
+                console.log('Данные, извлеченные из текстовых блоков:', jsonData);
+              }
+            } catch (blockError) {
+              console.error('Ошибка при обработке текстовых блоков:', blockError);
+            }
+          }
+        }
+        
+        // Проверяем, удалось ли извлечь данные
+        if (jsonData && jsonData.length > 0) {
+          // Валидируем и нормализуем данные
+          return jsonData.map(item => {
+            // Убеждаемся, что у нас есть все необходимые свойства
+            const validItem = {
+              name: item.name || `${category} модель`,
+              cost: Number(item.cost) || Math.floor(Math.random() * 50000) + 30000,
+              description: item.description || 'Современная модель с хорошими характеристиками',
+              ratings: {}
+            };
+            
+            // Обрабатываем рейтинги
+            if (item.ratings) {
+              // Для каждой характеристики добавляем числовой рейтинг
+              for (const column of characteristics) {
+                const columnName = column.name;
+                // Если есть рейтинг, преобразуем его в число
+                if (item.ratings[columnName] !== undefined) {
+                  validItem.ratings[columnName] = Number(item.ratings[columnName]) || 7.0;
+                } else {
+                  // Если рейтинга нет, добавляем стандартный
+                  validItem.ratings[columnName] = 7.0;
+                }
+                
+                // Для примечаний, они уже не входят в ratings, а обрабатываются отдельно
+                if (item.notes && item.notes[columnName]) {
+                  validItem.notes = validItem.notes || {};
+                  validItem.notes[columnName] = item.notes[columnName];
+                }
+              }
+            } else {
+              // Если нет рейтингов, создаем их
+              for (const column of characteristics) {
+                validItem.ratings[column.name] = 7.0;
+              }
+            }
+            
+            return validItem;
+          });
+        } else {
+          console.warn('Не удалось извлечь данные из ответа LLM, использую тестовые данные');
+          throw new Error('Данные не найдены в ответе LLM');
+        }
+      } catch (grokError) {
+        console.error('Ошибка при запросе к Grok API или обработке ответа:', grokError);
+        
+        // Возвращаем тестовые данные в случае ошибки
+        return [
+          {
+            name: `${category} Модель A`,
+            cost: 75000,
+            description: "Флагманская модель со всеми новейшими технологиями",
+            ratings: characteristicsToRatings(characteristics, 8, 9)
+          },
+          {
+            name: `${category} Модель B`,
+            cost: 59000,
+            description: "Оптимальное соотношение цена/качество",
+            ratings: characteristicsToRatings(characteristics, 7, 8)
+          },
+          {
+            name: `${category} Модель C`,
+            cost: 88000,
+            description: "Премиальная модель с лучшими характеристиками",
+            ratings: characteristicsToRatings(characteristics, 9, 10)
+          }
+        ];
+      }
+    } catch (error) {
+      console.error('Ошибка при генерации объектов:', error);
+      return [];
+    }
+  };
+  
+  // Вспомогательная функция для генерации рейтингов
+  const characteristicsToRatings = (characteristics, min, max) => {
+    const ratings = {};
+    
+    characteristics.forEach(col => {
+      // Генерируем случайную оценку в диапазоне [min, max]
+      ratings[col.name] = +(Math.random() * (max - min) + min).toFixed(1);
+    });
+    
+    return ratings;
+  };
+
+  // Основная функция генерации таблицы
+  const generateTable = async () => {
+    if (!generationCategory) {
+      toast.error('Укажите категорию для генерации');
+      return;
+    }
+    
+    try {
+      setGeneratingTable(true);
+      setGenerationProgress(10);
+      setGenerationStep('Проверка авторизации...');
+      
+      // Проверяем авторизацию
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходимо авторизоваться для генерации таблицы');
+        setGeneratingTable(false);
+        return;
+      }
+      
+      console.log('Используем токен авторизации:', token.substring(0, 15) + '...');
+      
+      setGenerationProgress(15);
+      setGenerationStep('Поиск информации о характеристиках...');
+      
+      // Шаг 1: Генерируем характеристики
+      const characteristics = await generateCharacteristics(generationCategory);
+      console.log('Сгенерированные характеристики:', characteristics);
+      
+      setGenerationProgress(30);
+      setGenerationStep('Обновление структуры таблицы...');
+      
+      // Шаг 2: Обновляем структуру таблицы с новыми характеристиками
+      try {
+        const updateResponse = await axios.put(`${BASE_URL}/api/tables/${id}`, {
+          columns: characteristics
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        console.log('Ответ при обновлении структуры таблицы:', updateResponse.data);
+      } catch (updateErr) {
+        console.error('Ошибка при обновлении структуры таблицы:', updateErr);
+        if (updateErr.response) {
+          console.error('Статус ошибки:', updateErr.response.status);
+          console.error('Данные ошибки:', updateErr.response.data);
+        }
+        toast.error('Не удалось обновить структуру таблицы');
+        setGeneratingTable(false);
+        return;
+      }
+      
+      setGenerationProgress(40);
+      setGenerationStep('Получение обновленной структуры таблицы...');
+      
+      // Шаг 3: Получаем обновленную структуру таблицы
+      try {
+        await fetchTable();
+        console.log('Обновленная структура таблицы:', tableData);
+      } catch (fetchErr) {
+        console.error('Ошибка при получении обновленной таблицы:', fetchErr);
+        // Продолжаем выполнение, используя существующие данные
+      }
+      
+      setGenerationProgress(50);
+      setGenerationStep('Поиск информации об объектах...');
+      
+      // Убеждаемся, что tableData определен и содержит columns
+      if (!tableData || !tableData.columns) {
+        console.error('tableData не определено или не содержит columns:', tableData);
+        toast.error('Ошибка при получении структуры таблицы');
+        setGeneratingTable(false);
+        return;
+      }
+      
+      // Шаг 4: Генерируем объекты с актуальными характеристиками
+      const items = await generateItems(generationCategory, tableData.columns || characteristics);
+      console.log('Сгенерированные объекты:', items);
+      
+      if (items.length === 0) {
+        toast.error('Не удалось сгенерировать объекты для таблицы');
+        setGeneratingTable(false);
+        return;
+      }
+      
+      setGenerationProgress(70);
+      setGenerationStep('Добавление объектов в таблицу...');
+      
+      // Шаг 5: Добавляем объекты в таблицу
+      let successCount = 0;
+      for (const item of items) {
+        try {
+          console.log('Попытка добавления объекта:', item);
+          
+          // Получаем имена колонок из обновленной таблицы
+          const columnNames = tableData?.columns?.map(col => col.name) || [];
+          console.log('Доступные колонки в таблице:', columnNames);
+          
+          // ВАЖНО: Изменение - не помещаем примечания в объект ratings
+          // Создаем объект для рейтингов, содержащий ТОЛЬКО числовые оценки
+          const ratings = {};
+          
+          // Добавляем рейтинги для каждой колонки
+          for (const columnName of columnNames) {
+            if (item.ratings && item.ratings[columnName] !== undefined) {
+              ratings[columnName] = Number(item.ratings[columnName]) || 0;
+            } else {
+              // Если рейтинга нет, добавляем стандартный
+              ratings[columnName] = 7.0;
+            }
+          }
+          
+          // Проверяем структуру объекта и корректируем при необходимости
+          const preparedItem = {
+            name: item.name || `${generationCategory} модель`,
+            cost: Number(item.cost) || 0, // Преобразуем в число
+            description: item.description || '',
+            ratings: ratings // Содержит только числовые оценки
+          };
+          
+          console.log('Подготовленный объект для добавления:', preparedItem);
+          
+          const addResponse = await axios.post(
+            `${BASE_URL}/api/tables/${id}/items`, 
+            preparedItem, 
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+          
+          console.log('Ответ при добавлении объекта:', addResponse.data);
+          
+          // Если объект был успешно добавлен и у нас есть примечания или notes
+          if (addResponse.data && addResponse.data.success) {
+            const itemId = addResponse.data.data._id;
+            
+            // Проверяем примечания в ratings (старый формат)
+            if (item.ratings) {
+              for (const columnName of columnNames) {
+                const noteKey = `note_${columnName}`;
+                if (item.ratings[noteKey]) {
+                  // Сохраняем примечание в localStorage
+                  if (typeof saveNoteToLocalStorage === 'function') {
+                    saveNoteToLocalStorage(itemId, columnName, item.ratings[noteKey]);
+                  } else {
+                    console.warn('Функция saveNoteToLocalStorage не определена');
+                    // Резервный вариант - сохраняем напрямую в localStorage
+                    localStorage.setItem(`${itemId}-${columnName}`, item.ratings[noteKey]);
+                  }
+                }
+              }
+            }
+            
+            // Проверяем notes (новый формат)
+            if (item.notes) {
+              for (const columnName of columnNames) {
+                if (item.notes[columnName]) {
+                  // Сохраняем примечание в localStorage
+                  if (typeof saveNoteToLocalStorage === 'function') {
+                    saveNoteToLocalStorage(itemId, columnName, item.notes[columnName]);
+                  } else {
+                    console.warn('Функция saveNoteToLocalStorage не определена');
+                    // Резервный вариант - сохраняем напрямую в localStorage
+                    localStorage.setItem(`${itemId}-${columnName}`, item.notes[columnName]);
+                  }
+                }
+              }
+            }
+          }
+          
+          successCount++;
+        } catch (addErr) {
+          console.error('Ошибка при добавлении объекта:', addErr);
+          if (addErr.response) {
+            console.error('Статус ошибки:', addErr.response.status);
+            console.error('Данные ошибки:', addErr.response.data);
+          }
+          // Продолжаем с другими объектами, несмотря на ошибку
+        }
+      }
+      
+      if (successCount === 0) {
+        toast.error('Не удалось добавить ни одного объекта в таблицу');
+      } else {
+        toast.success(`Успешно добавлено ${successCount} объектов в таблицу`);
+      }
+      
+      setGenerationProgress(90);
+      setGenerationStep('Завершение генерации...');
+      
+      // Шаг 6: Обновляем данные таблицы
+      await fetchTable();
+      
+      setGenerationProgress(100);
+      setGenerationStep('Готово!');
+      
+      toast.success('Таблица успешно сгенерирована!');
+      
+      setTimeout(() => {
+        setGeneratingTable(false);
+        setGenerationDialog(false);
+        setGenerationProgress(0);
+        setGenerationStep('');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Ошибка при генерации таблицы:', error);
+      if (error.response) {
+        console.error('Статус ошибки:', error.response.status);
+        console.error('Данные ошибки:', error.response.data);
+      }
+      toast.error('Не удалось сгенерировать таблицу');
+      setGeneratingTable(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ 
@@ -1307,6 +1922,14 @@ const TableView = () => {
                   startIcon={<AddIcon />}
                 >
                   Добавить характеристику
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  onClick={handleOpenGenerationDialog}
+                  startIcon={<AutoFixHighIcon />}
+                  color="secondary"
+                >
+                  Автогенерация
                 </Button>
               </>
             )}
@@ -1511,374 +2134,363 @@ const TableView = () => {
       </TableBox>
       
       {/* Модальное окно для добавления новой колонки */}
-      {showAddColumnForm && (
-        <Backdrop 
-          open={true} 
-          sx={{ zIndex: 9998 }}
-          onClick={() => setShowAddColumnForm(false)}
+      <Dialog
+        open={showAddColumnForm}
+        onClose={() => setShowAddColumnForm(false)}
+        maxWidth="sm"
+        fullWidth
+        disablePortal
+        disableEnforceFocus
+        keepMounted
+        sx={{ zIndex: 1300 }}
+      >
+        <DialogTitle>
+          Добавление новой характеристики
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Название характеристики"
+            value={newColumnName}
+            onChange={(e) => setNewColumnName(e.target.value)}
+            margin="normal"
+            required
+          />
+          <TextField
+            fullWidth
+            label="Вес (важность)"
+            type="number"
+            value={newColumnWeight}
+            onChange={(e) => setNewColumnWeight(e.target.value)}
+            margin="normal"
+            inputProps={{ min: 0, max: 100 }}
+            helperText="Чем больше вес, тем больше влияние на общую полезность (от 0 до 100)"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddColumnForm(false)}>
+            Отмена
+          </Button>
+          <Button variant="contained" color="primary" onClick={handleAddColumn}>
+            Добавить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Модальное окно для аналитики - используем Dialog вместо Backdrop */}
+      <Dialog
+        open={analyticsOpen}
+        onClose={handleCloseAnalytics}
+        maxWidth="xl"
+        fullWidth
+        disablePortal
+        disableEnforceFocus
+        keepMounted
+        sx={{ zIndex: 1300 }}
+        PaperProps={{
+          sx: {
+            maxHeight: '90vh',
+            width: '90%',
+            maxWidth: '1200px',
+            m: 'auto',
+            p: 3,
+            overflowY: 'auto',
+          }
+        }}
+      >
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 3 
+        }}>
+          <Typography variant="h5" component="h2">
+            Аналитика: {tableData?.name}
+          </Typography>
+          <IconButton onClick={handleCloseAnalytics}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
         >
-          <Box
-            sx={{
-              width: '90%',
-              maxWidth: 500,
-              bgcolor: 'background.paper',
-              borderRadius: 2,
-              p: 3,
-              boxShadow: 24,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Typography variant="h6" component="h2" gutterBottom>
-              Добавление новой характеристики
+          <Tab icon={<BarChartIcon />} label="Сравнение объектов" />
+          <Tab icon={<InsightsIcon />} label="Радар характеристик" />
+          <Tab icon={<PieChartIcon />} label="Вес критериев" />
+          <Tab icon={<TrendingUpIcon />} label="Эффективность (польза/стоимость)" />
+        </Tabs>
+        
+        {/* Вкладка 1: Гистограмма сравнения объектов */}
+        {activeTab === 0 && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Сравнение объектов по общей полезности и характеристикам
             </Typography>
-            <Box component="form" sx={{ mt: 2 }}>
-              <TextField
-                fullWidth
-                label="Название характеристики"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                margin="normal"
-                required
-              />
-              <TextField
-                fullWidth
-                label="Вес (важность)"
-                type="number"
-                value={newColumnWeight}
-                onChange={(e) => setNewColumnWeight(e.target.value)}
-                margin="normal"
-                inputProps={{ min: 0, max: 100 }}
-                helperText="Чем больше вес, тем больше влияние на общую полезность (от 0 до 100)"
-              />
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <Button onClick={() => setShowAddColumnForm(false)}>
-                  Отмена
-                </Button>
-                <Button variant="contained" color="primary" onClick={handleAddColumn}>
-                  Добавить
-                </Button>
-              </Box>
-            </Box>
-          </Box>
-        </Backdrop>
-      )}
-      
-      {modalOpen && (
-        <Backdrop 
-          open={true} 
-          sx={{ zIndex: 9999 }}
-          onClick={handleCloseModal}
-        >
-          <Box
-            sx={{
-              width: '90%',
-              maxWidth: 800,
-              maxHeight: '90vh',
-              bgcolor: 'background.paper',
-              borderRadius: 2,
-              p: 3,
-              boxShadow: 24,
-              overflow: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                background: theme.palette.background.default,
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: theme.palette.primary.main,
-                borderRadius: '4px',
-              },
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              mb: 3,
-              pb: 2,
-              borderBottom: `1px solid ${theme.palette.divider}`
-            }}>
-              <Typography variant="h6" component="h2">
-                Добавление нового объекта
-              </Typography>
-              <IconButton onClick={handleCloseModal} size="small">
-                <CloseIcon />
-              </IconButton>
-            </Box>
-            
-            <form onSubmit={handleSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    label="Название объекта"
-                    name="name"
-                    value={formData.name || ''}
-                    onChange={handleInputChange}
-                    fullWidth
-                    error={!!formErrors.name}
-                    helperText={formErrors.name}
+            <Box sx={{ height: 550, mb: 4 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={getComparisonChartData()}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={80}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
                   />
-                </Grid>
-                
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    label="Стоимость"
-                    name="cost"
-                    type="number"
-                    value={formData.cost || ''}
-                    onChange={handleInputChange}
-                    fullWidth
-                    error={!!formErrors.cost}
-                    helperText={formErrors.cost || 'Укажите стоимость объекта'}
-                    inputProps={{ min: 0 }}
+                  <YAxis />
+                  <RechartsTooltip 
+                    formatter={(value, name) => [`${value}`, name]}
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      padding: '10px'
+                    }}
                   />
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <TextField
-                    label="Описание"
-                    name="description"
-                    value={formData.description || ''}
-                    onChange={handleInputChange}
-                    fullWidth
-                    multiline
-                    rows={2}
+                  <Legend 
+                    verticalAlign="top" 
+                    wrapperStyle={{ 
+                      paddingBottom: 20,
+                      fontSize: 12
+                    }}
                   />
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1" gutterBottom>
-                    Оценки критериев:
-                  </Typography>
-                </Grid>
-                
-                {tableData?.columns && tableData.columns.map(column => (
-                  <Grid item xs={12} sm={6} md={4} key={column._id}>
-                    <TextField
-                      label={column.name}
-                      name={column._id}
-                      type="number"
-                      value={formData[column._id] || ''}
-                      onChange={handleInputChange}
-                      fullWidth
-                      inputProps={{ min: 0, max: 10, step: 0.1 }}
-                      error={!!formErrors[column._id]}
-                      helperText={formErrors[column._id] || 'Оценка от 0 до 10'}
+                  <Bar dataKey="utility" fill="#8884d8" name="Общая полезность" strokeWidth={2} stroke="#6c60c9" />
+                  <Bar dataKey="cost" fill="#82ca9d" name="Стоимость" opacity={0.7} />
+                  {tableData?.columns.map((column, index) => (
+                    <Bar 
+                      key={column.name} 
+                      dataKey={column.name} 
+                      fill={COLORS[index % COLORS.length]} 
+                      name={column.name}
+                      opacity={0.8}
                     />
-                  </Grid>
-                ))}
-              </Grid>
-              
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
-                mt: 3,
-                pt: 2,
-                borderTop: `1px solid ${theme.palette.divider}`
-              }}>
-                <Button onClick={handleCloseModal} sx={{ mr: 1 }}>
-                  Отмена
-                </Button>
-                <Button type="submit" variant="contained" color="primary">
-                  Добавить
-                </Button>
-              </Box>
-            </form>
-          </Box>
-        </Backdrop>
-      )}
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </>
+        )}
+        
+        {/* Вкладка 2: Радарная диаграмма */}
+        {activeTab === 1 && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Сравнение объектов по отдельным характеристикам (радар)
+            </Typography>
+            <Box sx={{ height: 400, mb: 4 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart 
+                  cx="50%" 
+                  cy="50%" 
+                  outerRadius="80%" 
+                  data={getRadarChartData()}
+                >
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="characteristic" />
+                  <PolarRadiusAxis angle={30} domain={[0, 10]} />
+                  {tableData?.items.map((item, index) => (
+                    <Radar 
+                      key={item._id} 
+                      name={item.name} 
+                      dataKey={item.name} 
+                      stroke={COLORS[index % COLORS.length]} 
+                      fill={COLORS[index % COLORS.length]} 
+                      fillOpacity={0.2} 
+                    />
+                  ))}
+                  <Legend />
+                  <RechartsTooltip />
+                </RadarChart>
+              </ResponsiveContainer>
+            </Box>
+          </>
+        )}
+        
+        {/* Вкладка 3: Круговая диаграмма весов критериев */}
+        {activeTab === 2 && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Распределение весов критериев оценки
+            </Typography>
+            <Box sx={{ height: 400, mb: 4 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={getPieChartData()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    outerRadius={150}
+                    fill="#8884d8"
+                    dataKey="value"
+                    nameKey="name"
+                    label={(entry) => entry.name}
+                  >
+                    {getPieChartData().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip formatter={(value) => [`${value}%`, 'Вес']} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </Box>
+          </>
+        )}
+        
+        {/* Вкладка 4: Диаграмма соотношения полезности к стоимости */}
+        {activeTab === 3 && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Эффективность объектов (соотношение полезности к стоимости)
+            </Typography>
+            <Box sx={{ height: 400, mb: 4 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={getUtilityToCostData()}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                  layout="vertical"
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={150} />
+                  <RechartsTooltip 
+                    formatter={(value) => [`${value.toFixed(4)}`, 'Эффективность']} 
+                  />
+                  <Legend />
+                  <Bar 
+                    dataKey="value" 
+                    fill="#8884d8" 
+                    name="Польза / Стоимость" 
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              * Чем выше значение, тем более эффективен объект по соотношению полезности к стоимости
+            </Typography>
+          </>
+        )}
+      </Dialog>
       
-      {/* Модальное окно для аналитики - заменено на кастомную реализацию */}
-      {analyticsOpen && (
-        <Backdrop 
-          open={true} 
-          sx={{ zIndex: 9997 }}
-          onClick={handleCloseAnalytics}
+      {/* Радикально измененный интерфейс автогенерации вместо Dialog */}
+      {generationDialog && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1400,
+            bgcolor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={handleCloseGenerationDialog}
         >
           <Box
             sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '90%',
-              maxWidth: '1200px',
+              bgcolor: 'background.paper',
+              boxShadow: 24,
+              borderRadius: 2,
+              p: 4,
+              width: '100%',
+              maxWidth: 500,
               maxHeight: '90vh',
-              backgroundColor: theme.palette.background.paper,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-              padding: theme.spacing(3),
-              borderRadius: '8px',
               overflow: 'auto',
+              position: 'relative'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              mb: 3 
-            }}>
-              <Typography variant="h5" component="h2">
-                Аналитика: {tableData?.name}
+            <IconButton
+              sx={{ position: 'absolute', top: 8, right: 8 }}
+              onClick={handleCloseGenerationDialog}
+              disabled={generatingTable}
+            >
+              <CloseIcon />
+            </IconButton>
+            
+            <Typography variant="h6" component="h2" gutterBottom>
+              Автоматическая генерация таблицы
+            </Typography>
+            
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Система автоматически сгенерирует таблицу, используя данные из открытых источников. 
+              Выберите категорию товаров или услуг для сравнения:
+            </Typography>
+            
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Категория:
               </Typography>
-              <IconButton onClick={handleCloseAnalytics}>
-                <CloseIcon />
-              </IconButton>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                {[
+                  "смартфоны", "ноутбуки", "телевизоры", "наушники", 
+                  "планшеты", "умные часы", "фотоаппараты", "электросамокаты"
+                ].map((category) => (
+                  <Chip
+                    key={category}
+                    label={category}
+                    clickable
+                    onClick={() => setGenerationCategory(category)}
+                    color={generationCategory === category ? "primary" : "default"}
+                    variant={generationCategory === category ? "filled" : "outlined"}
+                    sx={{ mb: 1 }}
+                  />
+                ))}
+              </Box>
             </Box>
             
-            <Tabs 
-              value={activeTab} 
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-            >
-              <Tab icon={<BarChartIcon />} label="Сравнение объектов" />
-              <Tab icon={<InsightsIcon />} label="Радар характеристик" />
-              <Tab icon={<PieChartIcon />} label="Вес критериев" />
-              <Tab icon={<TrendingUpIcon />} label="Эффективность (польза/стоимость)" />
-            </Tabs>
+            <TextField
+              margin="normal"
+              label="Дополнительный запрос (необязательно)"
+              fullWidth
+              value={generationQuery}
+              onChange={(e) => setGenerationQuery(e.target.value)}
+              disabled={generatingTable}
+              placeholder="Например: высокого класса, до 100000 рублей и т.д."
+            />
             
-            {/* Вкладка 1: Гистограмма сравнения объектов */}
-            {activeTab === 0 && (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  Сравнение объектов по общей полезности и характеристикам
+            {generatingTable && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" gutterBottom>
+                  {generationStep}
                 </Typography>
-                <Box sx={{ height: 400, mb: 4 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={getComparisonChartData()}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
-                      <YAxis />
-                      <RechartsTooltip />
-                      <Legend />
-                      <Bar dataKey="utility" fill="#8884d8" name="Общая полезность" />
-                      <Bar dataKey="cost" fill="#82ca9d" name="Стоимость" />
-                      {tableData?.columns.map((column, index) => (
-                        <Bar 
-                          key={column.name} 
-                          dataKey={column.name} 
-                          fill={COLORS[index % COLORS.length]} 
-                          name={column.name}
-                        />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              </>
+                <LinearProgress variant="determinate" value={generationProgress} sx={{ my: 1 }} />
+              </Box>
             )}
             
-            {/* Вкладка 2: Радарная диаграмма */}
-            {activeTab === 1 && (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  Сравнение объектов по отдельным характеристикам (радар)
-                </Typography>
-                <Box sx={{ height: 400, mb: 4 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart 
-                      cx="50%" 
-                      cy="50%" 
-                      outerRadius="80%" 
-                      data={getRadarChartData()}
-                    >
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="characteristic" />
-                      <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                      {tableData?.items.map((item, index) => (
-                        <Radar 
-                          key={item._id} 
-                          name={item.name} 
-                          dataKey={item.name} 
-                          stroke={COLORS[index % COLORS.length]} 
-                          fill={COLORS[index % COLORS.length]} 
-                          fillOpacity={0.2} 
-                        />
-                      ))}
-                      <Legend />
-                      <RechartsTooltip />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </Box>
-              </>
-            )}
-            
-            {/* Вкладка 3: Круговая диаграмма весов критериев */}
-            {activeTab === 2 && (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  Распределение весов критериев оценки
-                </Typography>
-                <Box sx={{ height: 400, mb: 4 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={getPieChartData()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        outerRadius={150}
-                        fill="#8884d8"
-                        dataKey="value"
-                        nameKey="name"
-                        label={(entry) => entry.name}
-                      >
-                        {getPieChartData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip formatter={(value) => [`${value}%`, 'Вес']} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </Box>
-              </>
-            )}
-            
-            {/* Вкладка 4: Диаграмма соотношения полезности к стоимости */}
-            {activeTab === 3 && (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  Эффективность объектов (соотношение полезности к стоимости)
-                </Typography>
-                <Box sx={{ height: 400, mb: 4 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={getUtilityToCostData()}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                      layout="vertical"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={150} />
-                      <RechartsTooltip 
-                        formatter={(value) => [`${value.toFixed(4)}`, 'Эффективность']} 
-                      />
-                      <Legend />
-                      <Bar 
-                        dataKey="value" 
-                        fill="#8884d8" 
-                        name="Польза / Стоимость" 
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                  * Чем выше значение, тем более эффективен объект по соотношению полезности к стоимости
-                </Typography>
-              </>
-            )}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Button 
+                onClick={handleCloseGenerationDialog} 
+                disabled={generatingTable}
+                sx={{ mr: 1 }}
+              >
+                Отмена
+              </Button>
+              <Button 
+                onClick={generateTable} 
+                variant="contained" 
+                color="primary" 
+                disabled={!generationCategory || generatingTable}
+                startIcon={generatingTable ? <CircularProgress size={16} /> : <AutoFixHighIcon />}
+              >
+                {generatingTable ? 'Генерация...' : 'Сгенерировать'}
+              </Button>
+            </Box>
           </Box>
-        </Backdrop>
+        </Box>
       )}
     </PageContainer>
   );

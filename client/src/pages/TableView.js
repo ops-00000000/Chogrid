@@ -1213,7 +1213,7 @@ const TableView = () => {
     }));
   };
 
-  // Функция для получения данных для диаграммы соотношения пользы к стоимости
+  // Функция для получения данных для диаграммы соотношения полезности к стоимости
   const getUtilityToCostData = () => {
     if (!tableData || !tableData.items || tableData.items.length === 0) return [];
     
@@ -1382,7 +1382,163 @@ const TableView = () => {
     }
   };
 
-  // Функция генерации объектов для таблицы
+  // Вспомогательная функция для нормализации названий колонок
+  const normalizeColumnName = (name) => {
+    if (!name) return '';
+    
+    // Удаляем звездочки, _ и другие спецсимволы, оставляем только буквы, цифры и пробелы
+    const normalized = name.replace(/\*\*|\*|_|\d+\.|^\d+\s+/g, '').trim().toLowerCase();
+    
+    // Словарь соответствия английских и русских терминов
+    const translations = {
+      // Процессор и производительность
+      'processor': 'процессор',
+      'performance': 'производительность',
+      'cpu': 'процессор',
+      
+      // Память
+      'ram': 'память',
+      'memory': 'память',
+      'storage': 'хранение',
+      'накопитель': 'хранение',
+      
+      // Дисплей
+      'display': 'дисплей',
+      'screen': 'экран',
+      'монитор': 'экран',
+      
+      // Батарея
+      'battery': 'батарея',
+      'battery life': 'время работы',
+      'аккумулятор': 'батарея',
+      
+      // Вес и портативность
+      'weight': 'вес',
+      'portability': 'портативность',
+      
+      // Цена
+      'price': 'цена',
+      'cost': 'стоимость',
+      
+      // Дизайн
+      'design': 'дизайн',
+      
+      // Обновления
+      'updates': 'обновления',
+      'upgrade': 'обновление',
+      
+      // Общие
+      'quality': 'качество',
+      'capabilities': 'возможности',
+      'size': 'размер',
+      'resolution': 'разрешение'
+    };
+    
+    return normalized;
+  };
+
+  // Вспомогательная функция для поиска соответствующего рейтинга по имени колонки
+  const findRatingForColumn = (ratings, columnName) => {
+    if (!ratings) return undefined;
+    
+    // Сначала пробуем найти точное совпадение
+    if (ratings[columnName] !== undefined) {
+      return { rating: ratings[columnName], key: columnName };
+    }
+    
+    // Нормализуем имя колонки
+    const normalizedColumnName = normalizeColumnName(columnName);
+    
+    // Словарь соответствия английских и русских терминов
+    const translations = {
+      // Процессор и производительность
+      'processor': 'процессор',
+      'performance': 'производительность',
+      'cpu': 'процессор',
+      
+      // Память
+      'ram': 'память',
+      'memory': 'память',
+      'storage': 'хранение',
+      'накопитель': 'хранение',
+      
+      // Дисплей
+      'display': 'дисплей',
+      'screen': 'экран',
+      'монитор': 'экран',
+      
+      // Батарея
+      'battery': 'батарея',
+      'battery life': 'время работы',
+      'аккумулятор': 'батарея',
+      
+      // Вес и портативность
+      'weight': 'вес',
+      'portability': 'портативность',
+      
+      // Цена
+      'price': 'цена',
+      'cost': 'стоимость',
+      
+      // Дизайн
+      'design': 'дизайн',
+      
+      // Обновления
+      'updates': 'обновления',
+      'upgrade': 'обновление',
+      
+      // Общие
+      'quality': 'качество',
+      'capabilities': 'возможности',
+      'size': 'размер',
+      'resolution': 'разрешение'
+    };
+    
+    // Ищем по ключам рейтингов
+    const keys = Object.keys(ratings);
+    for (const key of keys) {
+      const normalizedKey = normalizeColumnName(key);
+      
+      // Проверяем точное совпадение с нормализованными именами
+      if (normalizedKey === normalizedColumnName) {
+        return { rating: ratings[key], key };
+      }
+      
+      // Проверяем термины через словарь переводов
+      // Если ключ в рейтингах - английский термин, а колонка - русский аналог
+      if (translations[normalizedKey] === normalizedColumnName) {
+        return { rating: ratings[key], key };
+      }
+      
+      // Если ключ в рейтингах - русский термин, а колонка - английский аналог
+      if (normalizedKey === translations[normalizedColumnName]) {
+        return { rating: ratings[key], key };
+      }
+      
+      // Проверяем, содержит ли ключ или название колонки друг друга
+      if (normalizedKey.includes(normalizedColumnName) || 
+          normalizedColumnName.includes(normalizedKey)) {
+        return { rating: ratings[key], key };
+      }
+      
+      // Дополнительная проверка для сложных терминов
+      const columnParts = normalizedColumnName.split(/\s+/);
+      const keyParts = normalizedKey.split(/\s+/);
+      
+      // Если хотя бы одно слово совпадает
+      for (const part of columnParts) {
+        if (part.length < 3) continue; // Пропускаем короткие слова
+        if (keyParts.some(keyPart => keyPart.includes(part) || part.includes(keyPart))) {
+          return { rating: ratings[key], key };
+        }
+      }
+    }
+    
+    // Ничего не нашли
+    return undefined;
+  };
+
+  // Создание запроса для генерации объектов с обоснованиями
   const generateItems = async (category, characteristics) => {
     try {
       setGenerationProgress(60);
@@ -1401,6 +1557,7 @@ const TableView = () => {
 2. Примерную стоимость в рублях
 3. Краткое описание (1-2 предложения)
 4. Числовую оценку по шкале от 1 до 10 для каждой из перечисленных характеристик
+5. ВАЖНО: Добавь к каждой оценке краткое обоснование (1-2 предложения), почему эта модель получила такую оценку
 
 Верни только структурированный JSON с массивом объектов в следующем формате:
 [
@@ -1409,9 +1566,10 @@ const TableView = () => {
     "cost": число,
     "description": "Краткое описание",
     "ratings": {
-      "\${характеристика1}": число от 1 до 10,
-      "\${характеристика2}": число от 1 до 10,
-      ...и так для каждой характеристики
+      "\${характеристика1}": число от 1 до 10
+    },
+    "notes": {
+      "\${характеристика1}": "Обоснование оценки характеристики"
     }
   },
   ...и так для каждой модели
@@ -1434,7 +1592,7 @@ const TableView = () => {
             messages: [
               {
                 role: 'system',
-                content: 'Ты - эксперт по анализу технических характеристик и созданию сравнительных таблиц. Твоя задача - предоставить объективные данные для сравнения товаров в формате JSON. Используй только числовые значения для рейтингов.'
+                content: 'Ты - эксперт по анализу технических характеристик и созданию сравнительных таблиц. Твоя задача - предоставить объективные данные для сравнения товаров в формате JSON. Используй только числовые значения для рейтингов и добавь к каждому рейтингу подробное обоснование. Для каждой характеристики из таблицы нужно обязательно указать рейтинг и обоснование.'
               },
               {
                 role: 'user',
@@ -1522,15 +1680,20 @@ const TableView = () => {
                     ? descMatch[1].trim() 
                     : `Современная модель ${category} с отличными характеристиками`;
                   
-                  // Создаем объект с рейтингами
+                  // Создаем объект с рейтингами и примечаниями
                   const ratings = {};
+                  const notes = {};
                   
-                  // Для каждой характеристики ищем оценку
+                  // Для каждой характеристики ищем оценку и примечание
                   for (const column of characteristics) {
                     const columnName = column.name;
                     // Ищем оценку в формате "Characteristic: 8/10" или "Characteristic - 8"
                     const ratingPattern = new RegExp(`${columnName}[^\\d]+(\\d+(?:\\.\\d+)?)(?:\\/10|-|:)`, 'i');
                     const ratingMatch = block.match(ratingPattern);
+                    
+                    // Ищем примечание после оценки
+                    const notePattern = new RegExp(`${columnName}[^\\d]+\\d+(?:\\.\\d+)?(?:\\/10|-|:)\\s*(?:-\\s*|:\\s*|)([^\\n]+)`, 'i');
+                    const noteMatch = block.match(notePattern);
                     
                     // Если нашли оценку, добавляем ее; иначе ставим случайную оценку
                     if (ratingMatch) {
@@ -1539,9 +1702,17 @@ const TableView = () => {
                       // Если не удалось найти оценку, используем случайное значение
                       ratings[columnName] = Math.floor(Math.random() * 3) + 7; // Случайное число от 7 до 9
                     }
+                    
+                    // Если нашли примечание, добавляем его
+                    if (noteMatch) {
+                      notes[columnName] = noteMatch[1].trim();
+                    } else {
+                      // Стандартное примечание
+                      notes[columnName] = `Стандартное качество ${columnName.toLowerCase()} для этой ценовой категории`;
+                    }
                   }
                   
-                  return { name, cost, description, ratings };
+                  return { name, cost, description, ratings, notes };
                 });
                 
                 console.log('Данные, извлеченные из текстовых блоков:', jsonData);
@@ -1561,28 +1732,13 @@ const TableView = () => {
               name: item.name || `${category} модель`,
               cost: Number(item.cost) || Math.floor(Math.random() * 50000) + 30000,
               description: item.description || 'Современная модель с хорошими характеристиками',
-              ratings: {}
+              ratings: {},
+              notes: item.notes || {}
             };
             
             // Обрабатываем рейтинги
             if (item.ratings) {
-              // Для каждой характеристики добавляем числовой рейтинг
-              for (const column of characteristics) {
-                const columnName = column.name;
-                // Если есть рейтинг, преобразуем его в число
-                if (item.ratings[columnName] !== undefined) {
-                  validItem.ratings[columnName] = Number(item.ratings[columnName]) || 7.0;
-                } else {
-                  // Если рейтинга нет, добавляем стандартный
-                  validItem.ratings[columnName] = 7.0;
-                }
-                
-                // Для примечаний, они уже не входят в ratings, а обрабатываются отдельно
-                if (item.notes && item.notes[columnName]) {
-                  validItem.notes = validItem.notes || {};
-                  validItem.notes[columnName] = item.notes[columnName];
-                }
-              }
+              validItem.ratings = item.ratings;
             } else {
               // Если нет рейтингов, создаем их
               for (const column of characteristics) {
@@ -1605,19 +1761,22 @@ const TableView = () => {
             name: `${category} Модель A`,
             cost: 75000,
             description: "Флагманская модель со всеми новейшими технологиями",
-            ratings: characteristicsToRatings(characteristics, 8, 9)
+            ratings: characteristicsToRatings(characteristics, 8, 9),
+            notes: characteristicsToNotes(characteristics, "Превосходное")
           },
           {
             name: `${category} Модель B`,
             cost: 59000,
             description: "Оптимальное соотношение цена/качество",
-            ratings: characteristicsToRatings(characteristics, 7, 8)
+            ratings: characteristicsToRatings(characteristics, 7, 8),
+            notes: characteristicsToNotes(characteristics, "Хорошее")
           },
           {
             name: `${category} Модель C`,
             cost: 88000,
             description: "Премиальная модель с лучшими характеристиками",
-            ratings: characteristicsToRatings(characteristics, 9, 10)
+            ratings: characteristicsToRatings(characteristics, 9, 10),
+            notes: characteristicsToNotes(characteristics, "Отличное")
           }
         ];
       }
@@ -1638,45 +1797,16 @@ const TableView = () => {
     
     return ratings;
   };
-
-  // Вспомогательная функция для нормализации названий колонок
-  const normalizeColumnName = (name) => {
-    // Удаляем звездочки, _ и другие спецсимволы, оставляем только буквы, цифры и пробелы
-    return name.replace(/\*\*|\*|_|\d+\.|^\d+\s+/g, '').trim();
-  };
-
-  // Вспомогательная функция для поиска соответствующего рейтинга по имени колонки
-  const findRatingForColumn = (ratings, columnName) => {
-    if (!ratings) return undefined;
+  
+  // Вспомогательная функция для генерации примечаний
+  const characteristicsToNotes = (characteristics, quality) => {
+    const notes = {};
     
-    // Сначала пробуем найти точное совпадение
-    if (ratings[columnName] !== undefined) {
-      return ratings[columnName];
-    }
+    characteristics.forEach(col => {
+      notes[col.name] = `${quality} качество ${col.name.toLowerCase()} для данной модели.`;
+    });
     
-    // Нормализуем имя колонки
-    const normalizedColumnName = normalizeColumnName(columnName);
-    
-    // Ищем по нормализованному имени (полное совпадение)
-    if (ratings[normalizedColumnName] !== undefined) {
-      return ratings[normalizedColumnName];
-    }
-    
-    // Пытаемся найти частичное совпадение
-    const keys = Object.keys(ratings);
-    for (const key of keys) {
-      const normalizedKey = normalizeColumnName(key);
-      
-      // Проверяем, содержит ли ключ или название колонки друг друга
-      if (normalizedKey.includes(normalizedColumnName) || 
-          normalizedColumnName.includes(normalizedKey)) {
-        console.log(`Найдено соответствие для колонки "${columnName}": "${key}" (${ratings[key]})`);
-        return ratings[key];
-      }
-    }
-    
-    // Ничего не нашли
-    return undefined;
+    return notes;
   };
 
   // Основная функция генерации таблицы
@@ -1779,23 +1909,22 @@ const TableView = () => {
           const columnNames = tableData?.columns?.map(col => col.name) || [];
           console.log('Доступные колонки в таблице:', columnNames);
           
-          // ВАЖНО: Изменение - не помещаем примечания в объект ratings
-          // Создаем объект для рейтингов, содержащий ТОЛЬКО числовые оценки
-          const ratings = {};
-          
           // Выводим для отладки все доступные рейтинги
           if (item.ratings) {
             console.log('Доступные рейтинги в объекте:', Object.keys(item.ratings));
           }
           
+          // Создаем объект для рейтингов, содержащий ТОЛЬКО числовые оценки
+          const ratings = {};
+          
           // Добавляем рейтинги для каждой колонки
           for (const columnName of columnNames) {
-            // Используем новую функцию для поиска соответствующего рейтинга
-            const rating = findRatingForColumn(item.ratings, columnName);
+            // Используем улучшенную функцию для поиска соответствующего рейтинга
+            const ratingInfo = findRatingForColumn(item.ratings, columnName);
             
-            if (rating !== undefined) {
-              ratings[columnName] = Number(rating) || 0;
-              console.log(`Установлен рейтинг ${ratings[columnName]} для колонки "${columnName}"`);
+            if (ratingInfo) {
+              ratings[columnName] = Number(ratingInfo.rating) || 0;
+              console.log(`Установлен рейтинг ${ratings[columnName]} для колонки "${columnName}" (из "${ratingInfo.key}")`);
             } else {
               // Если рейтинга нет, добавляем стандартный
               ratings[columnName] = 7.0;
@@ -1826,38 +1955,60 @@ const TableView = () => {
           
           console.log('Ответ при добавлении объекта:', addResponse.data);
           
-          // Если объект был успешно добавлен и у нас есть примечания или notes
+          // Если объект был успешно добавлен, сохраняем примечания в localStorage
           if (addResponse.data && addResponse.data.success) {
             const itemId = addResponse.data.data._id;
             
-            // Проверяем примечания в ratings (старый формат)
-            if (item.ratings) {
+            // Обрабатываем примечания из объекта notes
+            if (item.notes) {
+              console.log('Сохраняем примечания для объекта:', Object.keys(item.notes));
+              
               for (const columnName of columnNames) {
-                const noteKey = `note_${columnName}`;
-                if (item.ratings[noteKey]) {
-                  // Сохраняем примечание в localStorage
-                  if (typeof saveNoteToLocalStorage === 'function') {
-                    saveNoteToLocalStorage(itemId, columnName, item.ratings[noteKey]);
-                  } else {
-                    console.warn('Функция saveNoteToLocalStorage не определена');
-                    // Резервный вариант - сохраняем напрямую в localStorage
-                    localStorage.setItem(`${itemId}-${columnName}`, item.ratings[noteKey]);
+                // Ищем примечание с учетом разных вариантов названия колонки
+                let noteText = null;
+                
+                // Сначала проверяем точное совпадение
+                if (item.notes[columnName]) {
+                  noteText = item.notes[columnName];
+                } else {
+                  // Используем поиск соответствия для названия колонки
+                  for (const noteKey of Object.keys(item.notes)) {
+                    const normalizedNoteKey = normalizeColumnName(noteKey);
+                    const normalizedColumnName = normalizeColumnName(columnName);
+                    
+                    if (normalizedNoteKey === normalizedColumnName || 
+                        normalizedNoteKey.includes(normalizedColumnName) || 
+                        normalizedColumnName.includes(normalizedNoteKey)) {
+                      noteText = item.notes[noteKey];
+                      console.log(`Найдено соответствие для примечания: "${columnName}" -> "${noteKey}"`);
+                      break;
+                    }
+                  }
+                }
+                
+                // Если нашли примечание, сохраняем его
+                if (noteText) {
+                  try {
+                    // Сохраняем примечание в localStorage
+                    console.log(`Сохраняем примечание для ${itemId}-${columnName}:`, noteText);
+                    saveNoteToLocalStorage(itemId, columnName, noteText);
+                  } catch (noteError) {
+                    console.error('Ошибка при сохранении примечания:', noteError);
                   }
                 }
               }
             }
             
-            // Проверяем notes (новый формат)
-            if (item.notes) {
+            // Для обратной совместимости также проверяем примечания в ratings
+            if (item.ratings) {
               for (const columnName of columnNames) {
-                if (item.notes[columnName]) {
-                  // Сохраняем примечание в localStorage
-                  if (typeof saveNoteToLocalStorage === 'function') {
-                    saveNoteToLocalStorage(itemId, columnName, item.notes[columnName]);
-                  } else {
-                    console.warn('Функция saveNoteToLocalStorage не определена');
-                    // Резервный вариант - сохраняем напрямую в localStorage
-                    localStorage.setItem(`${itemId}-${columnName}`, item.notes[columnName]);
+                const noteKey = `note_${columnName}`;
+                if (item.ratings[noteKey]) {
+                  try {
+                    // Сохраняем примечание в localStorage
+                    saveNoteToLocalStorage(itemId, columnName, item.ratings[noteKey]);
+                  } catch (noteError) {
+                    console.error('Ошибка при сохранении примечания из ratings:', noteError);
                   }
                 }
               }
@@ -2307,7 +2458,7 @@ const TableView = () => {
                     }}
                   />
                   <Legend 
-                    verticalAlign="top" 
+                    verticalAпlign="top" 
                     wrapperStyle={{ 
                       paddingBottom: 20,
                       fontSize: 12

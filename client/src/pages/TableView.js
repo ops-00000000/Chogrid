@@ -1556,8 +1556,10 @@ const TableView = () => {
 1. Название модели
 2. Примерную стоимость в рублях
 3. Краткое описание (1-2 предложения)
-4. ВАЖНО: Числовую оценку по шкале от 1 до 10 для КАЖДОЙ из перечисленных характеристик
-5. ВАЖНО: Добавь к каждой оценке краткое обоснование (1-2 предложения), почему эта модель получила такую оценку
+4. ОБЯЗАТЕЛЬНО: Для КАЖДОЙ из перечисленных характеристик укажи числовую оценку по шкале от 1 до 10
+5. ОБЯЗАТЕЛЬНО: Для КАЖДОЙ из перечисленных характеристик добавь краткое обоснование (1-2 предложения), почему эта модель получила такую оценку
+
+ОЧЕНЬ ВАЖНО: В твоем ответе должно быть обоснование оценки для КАЖДОЙ характеристики из списка. Ни одна характеристика не должна остаться без обоснования.
 
 Верни только структурированный JSON с массивом объектов в следующем формате:
 [
@@ -1573,7 +1575,7 @@ const TableView = () => {
     "notes": {
       "\${характеристика1}": "Обоснование оценки характеристики",
       "\${характеристика2}": "Обоснование оценки характеристики",
-      ... для каждой характеристики
+      ... для каждой характеристики обязательно нужно обоснование
     }
   },
   ... и так для каждой модели
@@ -1600,11 +1602,16 @@ const TableView = () => {
                 role: 'system',
                 content: `Ты - эксперт по анализу технических характеристик и созданию сравнительных таблиц. 
 Твоя задача - предоставить объективные данные для сравнения товаров в формате JSON. 
-Используй только числовые значения для рейтингов и добавь к каждому рейтингу подробное обоснование. 
+Используй только числовые значения для рейтингов и ОБЯЗАТЕЛЬНО добавь к КАЖДОМУ рейтингу подробное обоснование. 
 
-ОЧЕНЬ ВАЖНО: Используй только те характеристики, которые указаны в запросе. Не добавляй никаких других характеристик.
-Не используй звездочки или другие форматирующие символы в названиях характеристик.
-Названия характеристик должны точно соответствовать названиям из запроса.`
+КРАЙНЕ ВАЖНО: 
+1. Используй только те характеристики, которые указаны в запросе
+2. Не добавляй никаких других характеристик
+3. Не используй звездочки или другие форматирующие символы в названиях характеристик
+4. Названия характеристик должны точно соответствовать названиям из запроса
+5. ДЛЯ КАЖДОЙ указанной характеристики ДОЛЖНО быть обоснование, почему поставлена такая оценка
+6. Обоснование должно быть конкретным для каждой модели и характеристики
+7. Предоставь ответ в четком JSON формате`
               },
               {
                 role: 'user',
@@ -1699,29 +1706,57 @@ const TableView = () => {
                   // Для каждой характеристики ищем оценку и примечание
                   for (const column of characteristics) {
                     const columnName = cleanColumnName(column.name);
-                    // Ищем оценку в формате "Characteristic: 8/10" или "Characteristic - 8"
-                    const ratingPattern = new RegExp(`${columnName}[^\\d]+(\\d+(?:\\.\\d+)?)(?:\\/10|-|:)`, 'i');
-                    const ratingMatch = block.match(ratingPattern);
                     
-                    // Ищем примечание после оценки
-                    const notePattern = new RegExp(`${columnName}[^\\d]+\\d+(?:\\.\\d+)?(?:\\/10|-|:)\\s*(?:-\\s*|:\\s*|)([^\\n]+)`, 'i');
-                    const noteMatch = block.match(notePattern);
+                    // Улучшенный паттерн для поиска рейтингов
+                    const ratingPatterns = [
+                      // Формат "Характеристика: 8/10"
+                      new RegExp(`${columnName}[^\\d]+(\\d+(?:\\.\\d+)?)(?:\\/10|-|:)`, 'i'),
+                      // Формат "Рейтинг для Характеристика: 8"
+                      new RegExp(`(?:рейтинг|оценка)[^\\n]*${columnName}[^\\d]+(\\d+(?:\\.\\d+)?)`, 'i'),
+                      // Формат "Характеристика - 8 баллов"
+                      new RegExp(`${columnName}[^\\n]*?(?:-|:)\\s*(\\d+(?:\\.\\d+)?)\\s*(?:балл|из 10|очк|points)`, 'i')
+                    ];
                     
-                    // Если нашли оценку, добавляем ее; иначе ставим случайную оценку
-                    if (ratingMatch) {
-                      ratings[columnName] = Number(ratingMatch[1]);
-                    } else {
-                      // Если не удалось найти оценку, используем случайное значение
-                      ratings[columnName] = Math.floor(Math.random() * 3) + 7; // Случайное число от 7 до 9
+                    // Пробуем все паттерны по очереди
+                    let ratingValue;
+                    for (const pattern of ratingPatterns) {
+                      const match = block.match(pattern);
+                      if (match) {
+                        ratingValue = Number(match[1]);
+                        console.log(`Найден рейтинг ${ratingValue} для "${columnName}" по паттерну:`, pattern);
+                        break;
+                      }
                     }
                     
-                    // Если нашли примечание, добавляем его
-                    if (noteMatch) {
-                      notes[columnName] = noteMatch[1].trim();
-                    } else {
-                      // Стандартное примечание
-                      notes[columnName] = `Стандартное качество ${columnName.toLowerCase()} для этой ценовой категории`;
+                    // Если не нашли рейтинг, используем случайное значение
+                    ratings[columnName] = ratingValue || Math.floor(Math.random() * 3) + 7;
+                    
+                    // Улучшенные паттерны для поиска примечаний
+                    // Если рейтинг был найден, ищем примечание после него
+                    const notePatterns = [
+                      // После рейтинга следует примечание с тире или двоеточием
+                      new RegExp(`${columnName}[^\\n]*\\d+(?:\\.\\d+)?(?:\\/10)?(?:\\s*-\\s*|:\\s*)([^\\n]+)`, 'i'),
+                      // Примечание в отдельном блоке после рейтинга
+                      new RegExp(`${columnName}(?:[^\\n]*\\d+(?:\\.\\d+)?(?:\\/10)?)?[^\\n]*\\n\\s*([^\\n]+)`, 'i'),
+                      // Обоснование в скобках
+                      new RegExp(`${columnName}[^\\n]*\\d+(?:\\.\\d+)?(?:\\/10)?[^\\(]*\\(([^\\)]+)\\)`, 'i'),
+                      // Обоснование после фраз "потому что", "так как", "because"
+                      new RegExp(`${columnName}[^\\n]*\\d+(?:\\.\\d+)?(?:\\/10)?[^\\n]*(?:потому что|так как|because)\\s+([^\\n]+)`, 'i')
+                    ];
+                    
+                    // Пробуем все паттерны по очереди
+                    let noteText;
+                    for (const pattern of notePatterns) {
+                      const match = block.match(pattern);
+                      if (match) {
+                        noteText = match[1].trim();
+                        console.log(`Найдено примечание для "${columnName}": ${noteText.substring(0, 50)}...`);
+                        break;
+                      }
                     }
+                    
+                    // Если не нашли примечание, создаем дефолтное
+                    notes[columnName] = noteText || `${category} ${name} демонстрирует стандартное качество ${columnName.toLowerCase()} для своей ценовой категории.`;
                   }
                   
                   return { name, cost, description, ratings, notes };
@@ -1738,7 +1773,7 @@ const TableView = () => {
         // Проверяем, удалось ли извлечь данные
         if (jsonData && jsonData.length > 0) {
           // Валидируем и нормализуем данные
-          return jsonData.map(item => {
+          const validatedItems = jsonData.map(item => {
             // Убеждаемся, что у нас есть все необходимые свойства
             const validItem = {
               name: item.name || `${category} модель`,
@@ -1748,24 +1783,21 @@ const TableView = () => {
               notes: item.notes || {}
             };
             
-            // Обрабатываем рейтинги
-            const itemRatings = {};
-            
-            // Проверяем рейтинги только для наших характеристик
+            // Создаем рейтинги для всех характеристик
             for (const column of characteristics) {
-              const columnName = cleanColumnName(column.name);
+              const cleanedName = cleanColumnName(column.name);
               
               // Ищем рейтинг для этой характеристики
               let rating = 7.0; // По умолчанию
               
               if (item.ratings) {
                 // Пробуем найти прямое соответствие
-                if (item.ratings[columnName] !== undefined) {
-                  rating = Number(item.ratings[columnName]) || 7.0;
+                if (item.ratings[cleanedName] !== undefined) {
+                  rating = Number(item.ratings[cleanedName]) || 7.0;
                 }
                 // Пробуем найти с помощью улучшенного алгоритма
                 else {
-                  const found = findRatingForColumn(item.ratings, columnName);
+                  const found = findRatingForColumn(item.ratings, cleanedName);
                   if (found) {
                     rating = Number(found.rating) || 7.0;
                   }
@@ -1773,11 +1805,49 @@ const TableView = () => {
               }
               
               // Сохраняем рейтинг для этой характеристики
-              validItem.ratings[columnName] = rating;
+              validItem.ratings[cleanedName] = rating;
+              
+              // Проверяем, есть ли примечание для этой характеристики
+              let note = null;
+              
+              if (item.notes) {
+                // Пробуем найти прямое соответствие
+                if (item.notes[cleanedName] !== undefined) {
+                  note = item.notes[cleanedName];
+                }
+                // Пробуем найти с помощью улучшенного алгоритма
+                else {
+                  for (const noteKey of Object.keys(item.notes)) {
+                    const normalizedNoteKey = normalizeColumnName(noteKey);
+                    const normalizedColumnName = normalizeColumnName(cleanedName);
+                    
+                    if (normalizedNoteKey === normalizedColumnName || 
+                        normalizedNoteKey.includes(normalizedColumnName) || 
+                        normalizedColumnName.includes(normalizedNoteKey)) {
+                      note = item.notes[noteKey];
+                      console.log(`Найдено соответствие для примечания: "${cleanedName}" -> "${noteKey}"`);
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // Если не нашли примечание, создаем его
+              if (!note) {
+                note = `${validItem.name} имеет ${getRatingDescription(rating)} по характеристике "${cleanedName}".`;
+              }
+              
+              // Сохраняем примечание
+              validItem.notes[cleanedName] = note;
             }
+            
+            console.log(`Подготовлен объект ${validItem.name} с рейтингами:`, Object.keys(validItem.ratings));
+            console.log(`Подготовлен объект ${validItem.name} с примечаниями:`, Object.keys(validItem.notes));
             
             return validItem;
           });
+          
+          return validatedItems;
         } else {
           console.warn('Не удалось извлечь данные из ответа LLM, использую тестовые данные');
           throw new Error('Данные не найдены в ответе LLM');
@@ -1822,7 +1892,7 @@ const TableView = () => {
     
     characteristics.forEach(col => {
       // Генерируем случайную оценку в диапазоне [min, max]
-      ratings[col.name] = +(Math.random() * (max - min) + min).toFixed(1);
+      ratings[cleanColumnName(col.name)] = +(Math.random() * (max - min) + min).toFixed(1);
     });
     
     return ratings;
@@ -1833,7 +1903,8 @@ const TableView = () => {
     const notes = {};
     
     characteristics.forEach(col => {
-      notes[col.name] = `${quality} качество ${col.name.toLowerCase()} для данной модели.`;
+      const cleanName = cleanColumnName(col.name);
+      notes[cleanName] = `${quality} качество ${cleanName.toLowerCase()} для данной модели.`;
     });
     
     return notes;
@@ -1842,6 +1913,16 @@ const TableView = () => {
   // Функция очистки имени колонки от служебных символов при создании/обновлении
   const cleanColumnName = (name) => {
     return name.replace(/\*\*|\*/g, '').trim();
+  };
+
+  // Функция для получения текстового описания рейтинга
+  const getRatingDescription = (rating) => {
+    if (rating >= 9) return "отличные показатели";
+    if (rating >= 8) return "очень хорошие показатели";
+    if (rating >= 7) return "хорошие показатели";
+    if (rating >= 6) return "средние показатели";
+    if (rating >= 5) return "удовлетворительные показатели";
+    return "невысокие показатели";
   };
 
   // Основная функция генерации таблицы

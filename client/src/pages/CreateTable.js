@@ -51,8 +51,7 @@ const CreateTable = () => {
   };
 
   const validateWeights = (columns) => {
-    const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
-    return Math.abs(totalWeight - 100) < 0.01;
+    return columns.every(column => column.weight > 0);
   };
 
   const addColumn = () => {
@@ -66,9 +65,8 @@ const CreateTable = () => {
       return;
     }
 
-    const totalWeight = tableData.columns.reduce((sum, col) => sum + col.weight, 0) + newColumn.weight;
-    if (totalWeight > 100) {
-      setError('Сумма весов не может превышать 100%. Текущая сумма: ' + totalWeight + '%');
+    if (newColumn.weight <= 0) {
+      setError('Вес должен быть положительным числом');
       return;
     }
 
@@ -76,9 +74,7 @@ const CreateTable = () => {
       ...tableData,
       columns: [...tableData.columns, { ...newColumn }]
     });
-    const remainingWeight = 100 - (tableData.columns.length + 1) * newColumn.weight;
-    const defaultWeight = Math.min(Math.max(1, remainingWeight), 20);
-    setNewColumn({ name: '', weight: defaultWeight });
+    setNewColumn({ name: '', weight: 10 });
     setError(null);
   };
 
@@ -102,8 +98,7 @@ const CreateTable = () => {
     }
 
     if (!validateWeights(tableData.columns)) {
-      setError('Сумма весов должна равняться 100%. Текущая сумма: ' + 
-        tableData.columns.reduce((sum, col) => sum + col.weight, 0).toFixed(1) + '%');
+      setError('Все веса должны быть положительными числами');
       return;
     }
 
@@ -197,9 +192,8 @@ const CreateTable = () => {
                 type="number"
                 value={newColumn.weight}
                 onChange={handleColumnChange}
-                inputProps={{ min: 1, max: 100, step: 1 }}
+                inputProps={{ min: 1, step: 1 }}
                 sx={{ width: '120px', mr: 2 }}
-                helperText={`Сумма: ${tableData.columns.reduce((sum, col) => sum + col.weight, 0) + newColumn.weight}%`}
               />
               <Button
                 variant="contained"

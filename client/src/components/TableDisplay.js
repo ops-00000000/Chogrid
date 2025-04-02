@@ -62,7 +62,7 @@ const TableDisplay = ({ table }) => {
     ];
 
     const customColumns = columns.map(column => ({
-      Header: `${column.name} (${column.weight}%)`,
+      Header: `${column.name} (вес: ${column.weight})`,
       accessor: `ratings.${column.name}`,
       Cell: ({ value }) => (value !== undefined ? value : '-')
     }));

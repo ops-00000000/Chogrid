@@ -549,22 +549,21 @@ const TableView = () => {
     
     let totalUtility = 0;
     
-    // Проверка суммы весов - она должна быть близка к 100%
+    // Рассчитываем сумму весов для нормализации
     const totalColumnsWeight = tableData.columns.reduce((sum, col) => sum + col.weight, 0);
-    const weightMultiplier = totalColumnsWeight > 0 ? 100 / totalColumnsWeight : 1;
     
     tableData.columns.forEach(column => {
       const weight = column.weight || 1;
       const rating = item.ratings[column.name];
       
       if (rating !== undefined) {
-        // Используем процентный вес (приведенный к 100%)
-        const normalizedWeight = weight * weightMultiplier / 100;
+        // Нормализуем вес (сумма весов = 1) и умножаем на оценку
+        const normalizedWeight = totalColumnsWeight > 0 ? weight / totalColumnsWeight : 0;
         totalUtility += rating * normalizedWeight;
       }
     });
     
-    // Полезность - сумма произведений оценок на нормализованные веса
+    // Полезность теперь в диапазоне от 0 до 10
     return totalUtility.toFixed(2);
   };
 
@@ -575,7 +574,19 @@ const TableView = () => {
     
     if (cost === 0) return "∞"; // Если стоимость равна 0, возвращаем бесконечность
     
-    return (utility / cost).toFixed(3);
+    // Увеличиваем соотношение в 1000 раз для более наглядного отображения
+    // Например, если полезность = 8, а стоимость = 10000, то соотношение = 0.0008
+    // Умножаем на 1000, получаем 0.8, более наглядное значение
+    const ratio = (utility / cost) * 1000;
+    
+    // Форматируем вывод в зависимости от величины числа
+    if (ratio < 0.01) {
+      return ratio.toExponential(2); // Используем научную нотацию для очень малых чисел
+    } else if (ratio < 1) {
+      return ratio.toFixed(3); // Три знака после запятой для малых чисел
+    } else {
+      return ratio.toFixed(1); // Один знак после запятой для больших чисел
+    }
   };
 
   // Анимационные варианты
@@ -1215,13 +1226,29 @@ const TableView = () => {
                   <StyledTableCell align="right" sx={{
                     backgroundColor: alpha(theme.palette.success.light, 0.05)
                   }}>
-                    <Chip 
-                      label={getUtilityToCostRatio(item)}
-                      color="success" 
-                      variant="outlined" 
-                      size="small"
-                      title="Соотношение полезности к стоимости"
-                    />
+                    <Tooltip 
+                      title={
+                        <React.Fragment>
+                          <Typography variant="body2">
+                            Соотношение полезности к стоимости × 1000
+                          </Typography>
+                          <Typography variant="caption">
+                            Исходное значение: {(parseFloat(getUtility(item)) / (item.cost || 1)).toFixed(6)}
+                          </Typography>
+                          <Typography variant="caption" display="block">
+                            Чем выше значение, тем лучше соотношение цена/качество
+                          </Typography>
+                        </React.Fragment>
+                      } 
+                      arrow
+                    >
+                      <Chip 
+                        label={getUtilityToCostRatio(item)}
+                        color="success" 
+                        variant="outlined" 
+                        size="small"
+                      />
+                    </Tooltip>
                   </StyledTableCell>
                   
                   {tableData.columns && tableData.columns.map(column => (

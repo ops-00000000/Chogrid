@@ -238,6 +238,11 @@ const TableView = () => {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   
+  // Добавляем состояние для формы добавления колонки
+  const [showAddColumnForm, setShowAddColumnForm] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnWeight, setNewColumnWeight] = useState(10);
+  
   // Отслеживание состояния модального окна
   useEffect(() => {
     console.log('Текущее состояние modalOpen:', modalOpen);
@@ -1198,6 +1203,48 @@ const TableView = () => {
     '#d0ed57', '#ffc658', '#ff8042', '#ff6361', '#bc5090'
   ];
 
+  // Функция для добавления новой колонки
+  const handleAddColumn = async () => {
+    if (!newColumnName.trim()) {
+      toast.error('Введите название характеристики');
+      return;
+    }
+    
+    try {
+      // Клонируем текущие колонки таблицы
+      const updatedColumns = [...(tableData.columns || [])];
+      
+      // Добавляем новую колонку
+      updatedColumns.push({
+        name: newColumnName,
+        weight: parseInt(newColumnWeight, 10) || 10
+      });
+      
+      // Отправляем запрос на обновление таблицы
+      await axios.put(`${BASE_URL}/api/tables/${id}`, {
+        columns: updatedColumns
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      // Обновляем данные таблицы
+      await fetchTable();
+      
+      // Сбрасываем форму и закрываем её
+      setNewColumnName('');
+      setNewColumnWeight(10);
+      setShowAddColumnForm(false);
+      
+      toast.success('Характеристика успешно добавлена');
+    } catch (err) {
+      console.error('Ошибка при добавлении характеристики:', err);
+      toast.error('Не удалось добавить характеристику');
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ 
@@ -1463,6 +1510,59 @@ const TableView = () => {
         </TableContainer>
       </TableBox>
       
+      {/* Модальное окно для добавления новой колонки */}
+      {showAddColumnForm && (
+        <Backdrop 
+          open={true} 
+          sx={{ zIndex: 9998 }}
+          onClick={() => setShowAddColumnForm(false)}
+        >
+          <Box
+            sx={{
+              width: '90%',
+              maxWidth: 500,
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              p: 3,
+              boxShadow: 24,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h6" component="h2" gutterBottom>
+              Добавление новой характеристики
+            </Typography>
+            <Box component="form" sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Название характеристики"
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+                margin="normal"
+                required
+              />
+              <TextField
+                fullWidth
+                label="Вес (важность)"
+                type="number"
+                value={newColumnWeight}
+                onChange={(e) => setNewColumnWeight(e.target.value)}
+                margin="normal"
+                inputProps={{ min: 0, max: 100 }}
+                helperText="Чем больше вес, тем больше влияние на общую полезность (от 0 до 100)"
+              />
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                <Button onClick={() => setShowAddColumnForm(false)}>
+                  Отмена
+                </Button>
+                <Button variant="contained" color="primary" onClick={handleAddColumn}>
+                  Добавить
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        </Backdrop>
+      )}
+      
       {modalOpen && (
         <Backdrop 
           open={true} 
@@ -1593,174 +1693,193 @@ const TableView = () => {
         </Backdrop>
       )}
       
-      {/* Модальное окно для аналитики */}
-      <Modal
-        open={analyticsOpen}
-        onClose={handleCloseAnalytics}
-        closeAfterTransition
-        BackdropComponent={Backdrop}
-        BackdropProps={{
-          timeout: 500,
-        }}
-      >
-        <AnalyticsModal>
-          <AnalyticsHeader>
-            <Typography variant="h5" component="h2">
-              Аналитика: {tableData?.name}
-            </Typography>
-            <IconButton onClick={handleCloseAnalytics}>
-              <CloseIcon />
-            </IconButton>
-          </AnalyticsHeader>
-          
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      {/* Модальное окно для аналитики - заменено на кастомную реализацию */}
+      {analyticsOpen && (
+        <Backdrop 
+          open={true} 
+          sx={{ zIndex: 9997 }}
+          onClick={handleCloseAnalytics}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '90%',
+              maxWidth: '1200px',
+              maxHeight: '90vh',
+              backgroundColor: theme.palette.background.paper,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              padding: theme.spacing(3),
+              borderRadius: '8px',
+              overflow: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Tab icon={<BarChartIcon />} label="Сравнение объектов" />
-            <Tab icon={<InsightsIcon />} label="Радар характеристик" />
-            <Tab icon={<PieChartIcon />} label="Вес критериев" />
-            <Tab icon={<TrendingUpIcon />} label="Эффективность (польза/стоимость)" />
-          </Tabs>
-          
-          {/* Вкладка 1: Гистограмма сравнения объектов */}
-          {activeTab === 0 && (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Сравнение объектов по общей полезности и характеристикам
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              mb: 3 
+            }}>
+              <Typography variant="h5" component="h2">
+                Аналитика: {tableData?.name}
               </Typography>
-              <ChartContainer>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={getComparisonChartData()}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Bar dataKey="utility" fill="#8884d8" name="Общая полезность" />
-                    <Bar dataKey="cost" fill="#82ca9d" name="Стоимость" />
-                    {tableData?.columns.map((column, index) => (
-                      <Bar 
-                        key={column.name} 
-                        dataKey={column.name} 
-                        fill={COLORS[index % COLORS.length]} 
-                        name={column.name}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </>
-          )}
-          
-          {/* Вкладка 2: Радарная диаграмма */}
-          {activeTab === 1 && (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Сравнение объектов по отдельным характеристикам (радар)
-              </Typography>
-              <ChartContainer>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart 
-                    cx="50%" 
-                    cy="50%" 
-                    outerRadius="80%" 
-                    data={getRadarChartData()}
-                  >
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="characteristic" />
-                    <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                    {tableData?.items.map((item, index) => (
-                      <Radar 
-                        key={item._id} 
-                        name={item.name} 
-                        dataKey={item.name} 
-                        stroke={COLORS[index % COLORS.length]} 
-                        fill={COLORS[index % COLORS.length]} 
-                        fillOpacity={0.2} 
-                      />
-                    ))}
-                    <Legend />
-                    <RechartsTooltip />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </>
-          )}
-          
-          {/* Вкладка 3: Круговая диаграмма весов критериев */}
-          {activeTab === 2 && (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Распределение весов критериев оценки
-              </Typography>
-              <ChartContainer>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={getPieChartData()}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={true}
-                      outerRadius={150}
-                      fill="#8884d8"
-                      dataKey="value"
-                      nameKey="name"
-                      label={(entry) => entry.name}
+              <IconButton onClick={handleCloseAnalytics}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            
+            <Tabs 
+              value={activeTab} 
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab icon={<BarChartIcon />} label="Сравнение объектов" />
+              <Tab icon={<InsightsIcon />} label="Радар характеристик" />
+              <Tab icon={<PieChartIcon />} label="Вес критериев" />
+              <Tab icon={<TrendingUpIcon />} label="Эффективность (польза/стоимость)" />
+            </Tabs>
+            
+            {/* Вкладка 1: Гистограмма сравнения объектов */}
+            {activeTab === 0 && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Сравнение объектов по общей полезности и характеристикам
+                </Typography>
+                <Box sx={{ height: 400, mb: 4 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={getComparisonChartData()}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
                     >
-                      {getPieChartData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
+                      <YAxis />
+                      <RechartsTooltip />
+                      <Legend />
+                      <Bar dataKey="utility" fill="#8884d8" name="Общая полезность" />
+                      <Bar dataKey="cost" fill="#82ca9d" name="Стоимость" />
+                      {tableData?.columns.map((column, index) => (
+                        <Bar 
+                          key={column.name} 
+                          dataKey={column.name} 
+                          fill={COLORS[index % COLORS.length]} 
+                          name={column.name}
+                        />
                       ))}
-                    </Pie>
-                    <RechartsTooltip formatter={(value) => [`${value}%`, 'Вес']} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </>
-          )}
-          
-          {/* Вкладка 4: Диаграмма соотношения полезности к стоимости */}
-          {activeTab === 3 && (
-            <>
-              <Typography variant="h6" gutterBottom>
-                Эффективность объектов (соотношение полезности к стоимости)
-              </Typography>
-              <ChartContainer>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={getUtilityToCostData()}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                    layout="vertical"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={150} />
-                    <RechartsTooltip 
-                      formatter={(value) => [`${value.toFixed(4)}`, 'Эффективность']} 
-                    />
-                    <Legend />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#8884d8" 
-                      name="Польза / Стоимость" 
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                * Чем выше значение, тем более эффективен объект по соотношению полезности к стоимости
-              </Typography>
-            </>
-          )}
-        </AnalyticsModal>
-      </Modal>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </>
+            )}
+            
+            {/* Вкладка 2: Радарная диаграмма */}
+            {activeTab === 1 && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Сравнение объектов по отдельным характеристикам (радар)
+                </Typography>
+                <Box sx={{ height: 400, mb: 4 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart 
+                      cx="50%" 
+                      cy="50%" 
+                      outerRadius="80%" 
+                      data={getRadarChartData()}
+                    >
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="characteristic" />
+                      <PolarRadiusAxis angle={30} domain={[0, 10]} />
+                      {tableData?.items.map((item, index) => (
+                        <Radar 
+                          key={item._id} 
+                          name={item.name} 
+                          dataKey={item.name} 
+                          stroke={COLORS[index % COLORS.length]} 
+                          fill={COLORS[index % COLORS.length]} 
+                          fillOpacity={0.2} 
+                        />
+                      ))}
+                      <Legend />
+                      <RechartsTooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </>
+            )}
+            
+            {/* Вкладка 3: Круговая диаграмма весов критериев */}
+            {activeTab === 2 && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Распределение весов критериев оценки
+                </Typography>
+                <Box sx={{ height: 400, mb: 4 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={getPieChartData()}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={true}
+                        outerRadius={150}
+                        fill="#8884d8"
+                        dataKey="value"
+                        nameKey="name"
+                        label={(entry) => entry.name}
+                      >
+                        {getPieChartData().map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip formatter={(value) => [`${value}%`, 'Вес']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+              </>
+            )}
+            
+            {/* Вкладка 4: Диаграмма соотношения полезности к стоимости */}
+            {activeTab === 3 && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Эффективность объектов (соотношение полезности к стоимости)
+                </Typography>
+                <Box sx={{ height: 400, mb: 4 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={getUtilityToCostData()}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={150} />
+                      <RechartsTooltip 
+                        formatter={(value) => [`${value.toFixed(4)}`, 'Эффективность']} 
+                      />
+                      <Legend />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#8884d8" 
+                        name="Польза / Стоимость" 
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  * Чем выше значение, тем более эффективен объект по соотношению полезности к стоимости
+                </Typography>
+              </>
+            )}
+          </Box>
+        </Backdrop>
+      )}
     </PageContainer>
   );
 };

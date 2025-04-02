@@ -27,9 +27,11 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import SortIcon from '@mui/icons-material/Sort';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import TableChartIcon from '@mui/icons-material/TableChart';
+import DownloadIcon from '@mui/icons-material/Download';
 import axios from 'axios';
 import { BASE_URL } from '../config';
 import { toast } from 'react-toastify';
+import { smartphonesTable, laptopsTable, headphonesTable } from '../demoData';
 
 const PageTitle = styled(Typography)(({ theme }) => ({
   marginBottom: theme.spacing(3),
@@ -98,6 +100,7 @@ const PublicTables = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [tabValue, setTabValue] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
   
   const theme = useTheme();
   const navigate = useNavigate();
@@ -184,6 +187,65 @@ const PublicTables = () => {
       y: 0, 
       opacity: 1,
       transition: { duration: 0.5 }
+    }
+  };
+
+  // Функция для импорта демо-таблицы
+  const importDemoTable = async (tableData) => {
+    try {
+      // Получаем токен аутентификации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Необходима авторизация. Пожалуйста, войдите в систему');
+        navigate('/login');
+        return;
+      }
+      
+      // Настраиваем заголовки для запроса
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      
+      // Создаем таблицу
+      const response = await axios.post(`${BASE_URL}/api/tables`, tableData, { headers });
+      
+      console.log('Таблица успешно импортирована:', response.data);
+      
+      // Если есть объекты, добавляем их поочередно
+      if (tableData.items && tableData.items.length > 0) {
+        const tableId = response.data.data?._id || response.data._id;
+        
+        if (!tableId) {
+          throw new Error('Не удалось получить ID созданной таблицы');
+        }
+        
+        for (const item of tableData.items) {
+          await axios.post(`${BASE_URL}/api/tables/${tableId}/items`, item, { headers });
+        }
+      }
+      
+      toast.success(`Таблица "${tableData.name}" успешно импортирована!`);
+      fetchPublicTables(); // Обновляем список таблиц
+    } catch (err) {
+      console.error('Ошибка при импорте таблицы:', err);
+      toast.error('Ошибка при импорте таблицы');
+    }
+  };
+  
+  // Функция для импорта всех демо-таблиц
+  const importAllDemoTables = async () => {
+    try {
+      setIsImporting(true);
+      await importDemoTable(smartphonesTable);
+      await importDemoTable(laptopsTable);
+      await importDemoTable(headphonesTable);
+      toast.success('Все демонстрационные таблицы импортированы!');
+    } catch (err) {
+      console.error('Ошибка при импорте демонстрационных таблиц:', err);
+      toast.error('Ошибка при импорте демонстрационных таблиц');
+    } finally {
+      setIsImporting(false);
     }
   };
 

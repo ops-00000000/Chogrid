@@ -1545,18 +1545,18 @@ const TableView = () => {
       setGenerationStep('Генерация объектов...');
       
       // Формируем контекст для запроса к API
-      const columnNames = characteristics.map(col => col.name);
+      const columnNames = characteristics.map(col => cleanColumnName(col.name));
       
       // Создаем инструкции для Grok API
       const context = `
 Мне нужно сгенерировать информацию для сравнительной таблицы товаров в категории "${category}".
-Таблица содержит следующие характеристики для оценки: ${columnNames.join(', ')}.
+Таблица уже содержит следующие характеристики для оценки: ${columnNames.join(', ')}.
 
 Пожалуйста, предоставь информацию о 3-5 популярных моделях в этой категории. Для каждой модели укажи:
 1. Название модели
 2. Примерную стоимость в рублях
 3. Краткое описание (1-2 предложения)
-4. Числовую оценку по шкале от 1 до 10 для каждой из перечисленных характеристик
+4. ВАЖНО: Числовую оценку по шкале от 1 до 10 для КАЖДОЙ из перечисленных характеристик
 5. ВАЖНО: Добавь к каждой оценке краткое обоснование (1-2 предложения), почему эта модель получила такую оценку
 
 Верни только структурированный JSON с массивом объектов в следующем формате:
@@ -1566,14 +1566,20 @@ const TableView = () => {
     "cost": число,
     "description": "Краткое описание",
     "ratings": {
-      "\${характеристика1}": число от 1 до 10
+      "${характеристика1}": число от 1 до 10,
+      "${характеристика2}": число от 1 до 10,
+      ... только для указанных характеристик
     },
     "notes": {
-      "\${характеристика1}": "Обоснование оценки характеристики"
+      "${характеристика1}": "Обоснование оценки характеристики",
+      "${характеристика2}": "Обоснование оценки характеристики",
+      ... для каждой характеристики
     }
   },
-  ...и так для каждой модели
+  ... и так для каждой модели
 ]
+
+ВАЖНО: Используй только те характеристики, которые я перечислил выше. Не добавляй никаких других характеристик.
 `;
 
       // Дополнительные инструкции от пользователя
@@ -1592,7 +1598,13 @@ const TableView = () => {
             messages: [
               {
                 role: 'system',
-                content: 'Ты - эксперт по анализу технических характеристик и созданию сравнительных таблиц. Твоя задача - предоставить объективные данные для сравнения товаров в формате JSON. Используй только числовые значения для рейтингов и добавь к каждому рейтингу подробное обоснование. Для каждой характеристики из таблицы нужно обязательно указать рейтинг и обоснование.'
+                content: `Ты - эксперт по анализу технических характеристик и созданию сравнительных таблиц. 
+Твоя задача - предоставить объективные данные для сравнения товаров в формате JSON. 
+Используй только числовые значения для рейтингов и добавь к каждому рейтингу подробное обоснование. 
+
+ОЧЕНЬ ВАЖНО: Используй только те характеристики, которые указаны в запросе. Не добавляй никаких других характеристик.
+Не используй звездочки или другие форматирующие символы в названиях характеристик.
+Названия характеристик должны точно соответствовать названиям из запроса.`
               },
               {
                 role: 'user',
@@ -1686,7 +1698,7 @@ const TableView = () => {
                   
                   // Для каждой характеристики ищем оценку и примечание
                   for (const column of characteristics) {
-                    const columnName = column.name;
+                    const columnName = cleanColumnName(column.name);
                     // Ищем оценку в формате "Characteristic: 8/10" или "Characteristic - 8"
                     const ratingPattern = new RegExp(`${columnName}[^\\d]+(\\d+(?:\\.\\d+)?)(?:\\/10|-|:)`, 'i');
                     const ratingMatch = block.match(ratingPattern);
@@ -1737,13 +1749,31 @@ const TableView = () => {
             };
             
             // Обрабатываем рейтинги
-            if (item.ratings) {
-              validItem.ratings = item.ratings;
-            } else {
-              // Если нет рейтингов, создаем их
-              for (const column of characteristics) {
-                validItem.ratings[column.name] = 7.0;
+            const itemRatings = {};
+            
+            // Проверяем рейтинги только для наших характеристик
+            for (const column of characteristics) {
+              const columnName = cleanColumnName(column.name);
+              
+              // Ищем рейтинг для этой характеристики
+              let rating = 7.0; // По умолчанию
+              
+              if (item.ratings) {
+                // Пробуем найти прямое соответствие
+                if (item.ratings[columnName] !== undefined) {
+                  rating = Number(item.ratings[columnName]) || 7.0;
+                }
+                // Пробуем найти с помощью улучшенного алгоритма
+                else {
+                  const found = findRatingForColumn(item.ratings, columnName);
+                  if (found) {
+                    rating = Number(found.rating) || 7.0;
+                  }
+                }
               }
+              
+              // Сохраняем рейтинг для этой характеристики
+              validItem.ratings[columnName] = rating;
             }
             
             return validItem;
@@ -1809,6 +1839,11 @@ const TableView = () => {
     return notes;
   };
 
+  // Функция очистки имени колонки от служебных символов при создании/обновлении
+  const cleanColumnName = (name) => {
+    return name.replace(/\*\*|\*/g, '').trim();
+  };
+
   // Основная функция генерации таблицы
   const generateTable = async () => {
     if (!generationCategory) {
@@ -1831,63 +1866,35 @@ const TableView = () => {
       
       console.log('Используем токен авторизации:', token.substring(0, 15) + '...');
       
-      setGenerationProgress(15);
-      setGenerationStep('Поиск информации о характеристиках...');
-      
-      // Шаг 1: Генерируем характеристики
-      const characteristics = await generateCharacteristics(generationCategory);
-      console.log('Сгенерированные характеристики:', characteristics);
-      
+      // ВАЖНОЕ ИЗМЕНЕНИЕ: Не создаем новые характеристики при автогенерации,
+      // а используем существующие из таблицы
       setGenerationProgress(30);
-      setGenerationStep('Обновление структуры таблицы...');
+      setGenerationStep('Получение структуры таблицы...');
       
-      // Шаг 2: Обновляем структуру таблицы с новыми характеристиками
+      // Убеждаемся, что у нас есть структура таблицы
       try {
-        const updateResponse = await axios.put(`${BASE_URL}/api/tables/${id}`, {
-          columns: characteristics
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        console.log('Ответ при обновлении структуры таблицы:', updateResponse.data);
-      } catch (updateErr) {
-        console.error('Ошибка при обновлении структуры таблицы:', updateErr);
-        if (updateErr.response) {
-          console.error('Статус ошибки:', updateErr.response.status);
-          console.error('Данные ошибки:', updateErr.response.data);
-        }
-        toast.error('Не удалось обновить структуру таблицы');
+        await fetchTable();
+        console.log('Текущая структура таблицы:', tableData);
+      } catch (fetchErr) {
+        console.error('Ошибка при получении таблицы:', fetchErr);
+        toast.error('Не удалось получить структуру таблицы');
         setGeneratingTable(false);
         return;
       }
       
-      setGenerationProgress(40);
-      setGenerationStep('Получение обновленной структуры таблицы...');
-      
-      // Шаг 3: Получаем обновленную структуру таблицы
-      try {
-        await fetchTable();
-        console.log('Обновленная структура таблицы:', tableData);
-      } catch (fetchErr) {
-        console.error('Ошибка при получении обновленной таблицы:', fetchErr);
-        // Продолжаем выполнение, используя существующие данные
+      // Проверяем, что у таблицы есть колонки
+      if (!tableData || !tableData.columns || tableData.columns.length === 0) {
+        console.error('Таблица не содержит характеристик:', tableData);
+        toast.error('Таблица не содержит характеристик. Сначала добавьте характеристики.');
+        setGeneratingTable(false);
+        return;
       }
       
       setGenerationProgress(50);
       setGenerationStep('Поиск информации об объектах...');
       
-      // Убеждаемся, что tableData определен и содержит columns
-      if (!tableData || !tableData.columns) {
-        console.error('tableData не определено или не содержит columns:', tableData);
-        toast.error('Ошибка при получении структуры таблицы');
-        setGeneratingTable(false);
-        return;
-      }
-      
-      // Шаг 4: Генерируем объекты с актуальными характеристиками
-      const items = await generateItems(generationCategory, tableData.columns || characteristics);
+      // Шаг 4: Генерируем объекты с существующими характеристиками
+      const items = await generateItems(generationCategory, tableData.columns);
       console.log('Сгенерированные объекты:', items);
       
       if (items.length === 0) {
@@ -1905,9 +1912,12 @@ const TableView = () => {
         try {
           console.log('Попытка добавления объекта:', item);
           
-          // Получаем имена колонок из обновленной таблицы
+          // Получаем имена колонок из таблицы и очищаем их от символов
           const columnNames = tableData?.columns?.map(col => col.name) || [];
+          const cleanColumnNames = columnNames.map(cleanColumnName);
+          
           console.log('Доступные колонки в таблице:', columnNames);
+          console.log('Очищенные имена колонок:', cleanColumnNames);
           
           // Выводим для отладки все доступные рейтинги
           if (item.ratings) {
@@ -1918,13 +1928,29 @@ const TableView = () => {
           const ratings = {};
           
           // Добавляем рейтинги для каждой колонки
-          for (const columnName of columnNames) {
-            // Используем улучшенную функцию для поиска соответствующего рейтинга
-            const ratingInfo = findRatingForColumn(item.ratings, columnName);
+          for (let i = 0; i < columnNames.length; i++) {
+            const columnName = columnNames[i]; // Оригинальное имя с символами
+            const cleanName = cleanColumnNames[i]; // Очищенное имя
             
-            if (ratingInfo) {
-              ratings[columnName] = Number(ratingInfo.rating) || 0;
-              console.log(`Установлен рейтинг ${ratings[columnName]} для колонки "${columnName}" (из "${ratingInfo.key}")`);
+            // Проверяем варианты соответствия
+            let foundRating = null;
+            
+            // 1. Пробуем найти по оригинальному имени
+            if (item.ratings[columnName] !== undefined) {
+              foundRating = { rating: item.ratings[columnName], key: columnName };
+            } 
+            // 2. Пробуем найти по очищенному имени
+            else if (item.ratings[cleanName] !== undefined) {
+              foundRating = { rating: item.ratings[cleanName], key: cleanName };
+            }
+            // 3. Используем улучшенную функцию сопоставления
+            else {
+              foundRating = findRatingForColumn(item.ratings, cleanName);
+            }
+            
+            if (foundRating) {
+              ratings[columnName] = Number(foundRating.rating) || 0;
+              console.log(`Установлен рейтинг ${ratings[columnName]} для колонки "${columnName}" (из "${foundRating.key}")`);
             } else {
               // Если рейтинга нет, добавляем стандартный
               ratings[columnName] = 7.0;
@@ -1963,18 +1989,26 @@ const TableView = () => {
             if (item.notes) {
               console.log('Сохраняем примечания для объекта:', Object.keys(item.notes));
               
-              for (const columnName of columnNames) {
+              for (let i = 0; i < columnNames.length; i++) {
+                const columnName = columnNames[i];
+                const cleanName = cleanColumnNames[i];
+                
                 // Ищем примечание с учетом разных вариантов названия колонки
                 let noteText = null;
                 
-                // Сначала проверяем точное совпадение
+                // 1. Сначала проверяем точное совпадение
                 if (item.notes[columnName]) {
                   noteText = item.notes[columnName];
-                } else {
-                  // Используем поиск соответствия для названия колонки
+                }
+                // 2. Проверяем по очищенному имени
+                else if (item.notes[cleanName]) {
+                  noteText = item.notes[cleanName];
+                } 
+                // 3. Ищем среди всех примечаний подходящее
+                else {
                   for (const noteKey of Object.keys(item.notes)) {
                     const normalizedNoteKey = normalizeColumnName(noteKey);
-                    const normalizedColumnName = normalizeColumnName(columnName);
+                    const normalizedColumnName = normalizeColumnName(cleanName);
                     
                     if (normalizedNoteKey === normalizedColumnName || 
                         normalizedNoteKey.includes(normalizedColumnName) || 
@@ -1991,7 +2025,13 @@ const TableView = () => {
                   try {
                     // Сохраняем примечание в localStorage
                     console.log(`Сохраняем примечание для ${itemId}-${columnName}:`, noteText);
-                    saveNoteToLocalStorage(itemId, columnName, noteText);
+                    localStorage.setItem(`${itemId}-${columnName}`, noteText);
+                    
+                    // Обновляем объект примечаний в состоянии
+                    setNotes(prev => ({
+                      ...prev,
+                      [`${itemId}-${columnName}`]: noteText
+                    }));
                   } catch (noteError) {
                     console.error('Ошибка при сохранении примечания:', noteError);
                   }
@@ -2006,7 +2046,15 @@ const TableView = () => {
                 if (item.ratings[noteKey]) {
                   try {
                     // Сохраняем примечание в localStorage
-                    saveNoteToLocalStorage(itemId, columnName, item.ratings[noteKey]);
+                    const noteValue = item.ratings[noteKey];
+                    console.log(`Сохраняем примечание из ratings для ${itemId}-${columnName}:`, noteValue);
+                    localStorage.setItem(`${itemId}-${columnName}`, noteValue);
+                    
+                    // Обновляем объект примечаний в состоянии
+                    setNotes(prev => ({
+                      ...prev,
+                      [`${itemId}-${columnName}`]: noteValue
+                    }));
                   } catch (noteError) {
                     console.error('Ошибка при сохранении примечания из ratings:', noteError);
                   }

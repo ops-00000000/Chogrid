@@ -20,10 +20,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import TableChartIcon from '@mui/icons-material/TableChart';
+import DownloadIcon from '@mui/icons-material/Download';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { BASE_URL } from '../config';
 import { toast } from 'react-toastify';
+import { smartphonesTable, laptopsTable, headphonesTable } from '../demoData';
 
 const PageTitle = styled(Typography)(({ theme }) => ({
   marginBottom: theme.spacing(3),
@@ -178,6 +180,62 @@ const Dashboard = () => {
     }
   };
   
+  // Добавляем новую функцию для импорта демонстрационных таблиц
+  const importDemoTable = async (tableData) => {
+    try {
+      // Получаем токен аутентификации
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Ошибка авторизации. Пожалуйста, войдите заново');
+        navigate('/login');
+        return;
+      }
+      
+      // Настраиваем заголовки для запроса
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      
+      // Создаем таблицу
+      const response = await axios.post(`${BASE_URL}/api/tables`, tableData, { headers });
+      
+      console.log('Таблица успешно импортирована:', response.data);
+      
+      // Если есть объекты, добавляем их поочередно
+      if (tableData.items && tableData.items.length > 0) {
+        const tableId = response.data.data?._id || response.data._id;
+        
+        if (!tableId) {
+          throw new Error('Не удалось получить ID созданной таблицы');
+        }
+        
+        for (const item of tableData.items) {
+          await axios.post(`${BASE_URL}/api/tables/${tableId}/items`, item, { headers });
+        }
+      }
+      
+      toast.success(`Таблица "${tableData.name}" успешно импортирована!`);
+      fetchTables(); // Обновляем список таблиц
+    } catch (err) {
+      console.error('Ошибка при импорте таблицы:', err);
+      toast.error('Ошибка при импорте таблицы');
+    }
+  };
+  
+  // Добавляем функцию для импорта всех демонстрационных таблиц
+  const importAllDemoTables = async () => {
+    try {
+      await importDemoTable(smartphonesTable);
+      await importDemoTable(laptopsTable);
+      await importDemoTable(headphonesTable);
+      toast.success('Все демонстрационные таблицы импортированы!');
+    } catch (err) {
+      console.error('Ошибка при импорте демонстрационных таблиц:', err);
+      toast.error('Ошибка при импорте демонстрационных таблиц');
+    }
+  };
+  
   // Варианты анимации
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -212,67 +270,39 @@ const Dashboard = () => {
   }
   
   return (
-    <Container>
+    <Container maxWidth="lg">
       <Box sx={{ my: 4 }}>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          mb: 4,
-          flexDirection: { xs: 'column', sm: 'row' }
-        }}>
-          <PageTitle variant="h4" component="h1">
-            Мои таблицы
-          </PageTitle>
-          
+        <PageTitle variant="h4" component="h1" align="center">
+          Мои таблицы
+        </PageTitle>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
           <Button
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
             onClick={handleCreateTable}
-            sx={{ 
-              mt: { xs: 2, sm: 0 },
-              borderRadius: '50px',
-              fontWeight: 600,
-              textTransform: 'none',
-              py: 1.2,
-              px: 3
-            }}
           >
             Создать таблицу
           </Button>
-        </Box>
-        
-        {error && (
-          <Box sx={{ mb: 3 }}>
-            <Typography color="error">{error}</Typography>
-          </Box>
-        )}
-        
-        {tables.length === 0 ? (
-          <Box sx={{ 
-            textAlign: 'center', 
-            py: 8, 
-            backgroundColor: 'rgba(0, 0, 0, 0.03)',
-            borderRadius: 2
-          }}>
-            <TableChartIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-            <Typography variant="h6" color="textSecondary" gutterBottom>
-              У вас пока нет таблиц
-            </Typography>
-            <Typography variant="body2" color="textSecondary" paragraph>
-              Создайте первую таблицу для сравнения объектов
-            </Typography>
+          
+          {/* Отображаем кнопку импорта только для админа или если ID пользователя равен 1 */}
+          {user && (user.isAdmin || user._id === '1' || user.id === '1') && (
             <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={handleCreateTable}
-              sx={{ mt: 2 }}
+              variant="outlined"
+              color="secondary"
+              startIcon={<DownloadIcon />}
+              onClick={importAllDemoTables}
             >
-              Создать таблицу
+              Импортировать примеры
             </Button>
-          </Box>
+          )}
+        </Box>
+
+        {error ? (
+          <Typography color="error" align="center" variant="h6" sx={{ mt: 4 }}>
+            {error}
+          </Typography>
         ) : (
           <motion.div
             variants={containerVariants}
@@ -280,65 +310,77 @@ const Dashboard = () => {
             animate="visible"
           >
             <Grid container spacing={3}>
-              {tables.map((table) => (
-                <Grid item xs={12} sm={6} md={4} key={table._id}>
-                  <motion.div variants={itemVariants}>
-                    <TableCard>
-                      <CardActionArea onClick={() => handleViewTable(table._id)}>
-                        <IconContainer>
-                          <TableChartIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-                        </IconContainer>
-                        <CardContent sx={{ flexGrow: 1 }}>
-                          <Typography variant="h6" component="h2" gutterBottom sx={{ fontWeight: 600 }}>
-                            {table.name}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                            {table.description || 'Нет описания'}
-                          </Typography>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="caption" color="textSecondary">
-                              Объектов: {table.objects?.length || 0}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              Критериев: {table.criteria?.length || 0}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </CardActionArea>
-                      
-                      <Divider />
-                      
-                      <CardActions>
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={() => handleViewTable(table._id)}
-                        >
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={(e) => handleEditTable(table._id, e)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          color="error"
-                          onClick={() => handleDeleteTable(table._id)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                        <Box sx={{ flexGrow: 1 }} />
-                        <Typography variant="caption" color="textSecondary">
-                          {table.isPublic ? 'Публичная' : 'Приватная'}
-                        </Typography>
-                      </CardActions>
-                    </TableCard>
-                  </motion.div>
+              {tables.length === 0 ? (
+                <Grid item xs={12}>
+                  <Typography align="center" variant="body1" color="textSecondary" sx={{ mt: 4 }}>
+                    {loading ? 'Загрузка...' : 'У вас пока нет таблиц. Создайте свою первую таблицу!'}
+                  </Typography>
                 </Grid>
-              ))}
+              ) : (
+                tables.map((table) => (
+                  <Grid item xs={12} sm={6} md={4} key={table._id}>
+                    <motion.div variants={itemVariants}>
+                      <TableCard>
+                        <CardActionArea onClick={() => handleViewTable(table._id)}>
+                          <IconContainer>
+                            <TableChartIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                          </IconContainer>
+                          <CardContent sx={{ flexGrow: 1 }}>
+                            <Typography variant="h6" component="h2" gutterBottom>
+                              {table.name}
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                              {table.description || 'Нет описания'}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 'auto' }}>
+                              <Typography variant="caption" color="textSecondary">
+                                Создана: {new Date(table.createdAt).toLocaleDateString()}
+                              </Typography>
+                              {table.isPublic && (
+                                <Box sx={{ 
+                                  px: 1, 
+                                  py: 0.25, 
+                                  bgcolor: 'primary.light', 
+                                  color: 'white',
+                                  borderRadius: 1,
+                                  fontSize: '0.7rem' 
+                                }}>
+                                  Публичная
+                                </Box>
+                              )}
+                            </Box>
+                          </CardContent>
+                        </CardActionArea>
+                        <Divider />
+                        <CardActions>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleViewTable(table._id)}
+                            title="Просмотреть"
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => handleEditTable(table._id, e)}
+                            title="Редактировать"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleDeleteTable(table._id)}
+                            title="Удалить"
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </CardActions>
+                      </TableCard>
+                    </motion.div>
+                  </Grid>
+                ))
+              )}
             </Grid>
           </motion.div>
         )}

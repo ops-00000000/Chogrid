@@ -1639,6 +1639,46 @@ const TableView = () => {
     return ratings;
   };
 
+  // Вспомогательная функция для нормализации названий колонок
+  const normalizeColumnName = (name) => {
+    // Удаляем звездочки, _ и другие спецсимволы, оставляем только буквы, цифры и пробелы
+    return name.replace(/\*\*|\*|_|\d+\.|^\d+\s+/g, '').trim();
+  };
+
+  // Вспомогательная функция для поиска соответствующего рейтинга по имени колонки
+  const findRatingForColumn = (ratings, columnName) => {
+    if (!ratings) return undefined;
+    
+    // Сначала пробуем найти точное совпадение
+    if (ratings[columnName] !== undefined) {
+      return ratings[columnName];
+    }
+    
+    // Нормализуем имя колонки
+    const normalizedColumnName = normalizeColumnName(columnName);
+    
+    // Ищем по нормализованному имени (полное совпадение)
+    if (ratings[normalizedColumnName] !== undefined) {
+      return ratings[normalizedColumnName];
+    }
+    
+    // Пытаемся найти частичное совпадение
+    const keys = Object.keys(ratings);
+    for (const key of keys) {
+      const normalizedKey = normalizeColumnName(key);
+      
+      // Проверяем, содержит ли ключ или название колонки друг друга
+      if (normalizedKey.includes(normalizedColumnName) || 
+          normalizedColumnName.includes(normalizedKey)) {
+        console.log(`Найдено соответствие для колонки "${columnName}": "${key}" (${ratings[key]})`);
+        return ratings[key];
+      }
+    }
+    
+    // Ничего не нашли
+    return undefined;
+  };
+
   // Основная функция генерации таблицы
   const generateTable = async () => {
     if (!generationCategory) {
@@ -1743,13 +1783,23 @@ const TableView = () => {
           // Создаем объект для рейтингов, содержащий ТОЛЬКО числовые оценки
           const ratings = {};
           
+          // Выводим для отладки все доступные рейтинги
+          if (item.ratings) {
+            console.log('Доступные рейтинги в объекте:', Object.keys(item.ratings));
+          }
+          
           // Добавляем рейтинги для каждой колонки
           for (const columnName of columnNames) {
-            if (item.ratings && item.ratings[columnName] !== undefined) {
-              ratings[columnName] = Number(item.ratings[columnName]) || 0;
+            // Используем новую функцию для поиска соответствующего рейтинга
+            const rating = findRatingForColumn(item.ratings, columnName);
+            
+            if (rating !== undefined) {
+              ratings[columnName] = Number(rating) || 0;
+              console.log(`Установлен рейтинг ${ratings[columnName]} для колонки "${columnName}"`);
             } else {
               // Если рейтинга нет, добавляем стандартный
               ratings[columnName] = 7.0;
+              console.log(`Установлен стандартный рейтинг 7.0 для колонки "${columnName}" (не найдено соответствия)`);
             }
           }
           

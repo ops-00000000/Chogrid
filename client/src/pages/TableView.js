@@ -543,15 +543,39 @@ const TableView = () => {
     }
   };
 
-  // Заменяем функцию calculateUtility на использование готового значения utility
+  // Вычисление полезности объекта
   const getUtility = (item) => {
-    // Если у объекта есть готовое значение utility, используем его
-    if (item && item.utility !== undefined) {
-      return parseFloat(item.utility).toFixed(2);
-    }
+    if (!item.ratings || !tableData.columns) return 0;
     
-    // Иначе возвращаем 0
-    return '0.00';
+    let totalUtility = 0;
+    
+    // Проверка суммы весов - она должна быть близка к 100%
+    const totalColumnsWeight = tableData.columns.reduce((sum, col) => sum + col.weight, 0);
+    const weightMultiplier = totalColumnsWeight > 0 ? 100 / totalColumnsWeight : 1;
+    
+    tableData.columns.forEach(column => {
+      const weight = column.weight || 1;
+      const rating = item.ratings[column.name];
+      
+      if (rating !== undefined) {
+        // Используем процентный вес (приведенный к 100%)
+        const normalizedWeight = weight * weightMultiplier / 100;
+        totalUtility += rating * normalizedWeight;
+      }
+    });
+    
+    // Полезность - сумма произведений оценок на нормализованные веса
+    return totalUtility.toFixed(2);
+  };
+
+  // Вычисление соотношения полезности к стоимости
+  const getUtilityToCostRatio = (item) => {
+    const utility = parseFloat(getUtility(item));
+    const cost = item.cost || 1; // Избегаем деления на ноль
+    
+    if (cost === 0) return "∞"; // Если стоимость равна 0, возвращаем бесконечность
+    
+    return (utility / cost).toFixed(3);
   };
 
   // Анимационные варианты
@@ -1112,6 +1136,11 @@ const TableView = () => {
                 <HeadCell>Название</HeadCell>
                 <HeadCell align="right">Полезность</HeadCell>
                 <HeadCell align="right">Стоимость</HeadCell>
+                <HeadCell align="right" sx={{ 
+                  backgroundColor: alpha(theme.palette.success.light, 0.1) 
+                }}>
+                  Полезность/Стоимость
+                </HeadCell>
                 
                 {/* Колонки характеристик и примечаний */}
                 {tableData.columns?.map((col, idx) => (
@@ -1181,6 +1210,18 @@ const TableView = () => {
                     ) : (
                       `${item.cost?.toFixed(2) || 0} ₽`
                     )}
+                  </StyledTableCell>
+                  
+                  <StyledTableCell align="right" sx={{
+                    backgroundColor: alpha(theme.palette.success.light, 0.05)
+                  }}>
+                    <Chip 
+                      label={getUtilityToCostRatio(item)}
+                      color="success" 
+                      variant="outlined" 
+                      size="small"
+                      title="Соотношение полезности к стоимости"
+                    />
                   </StyledTableCell>
                   
                   {tableData.columns && tableData.columns.map(column => (

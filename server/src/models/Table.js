@@ -14,8 +14,15 @@ const CustomColumnSchema = new mongoose.Schema({
   },
   weight: {
     type: Number,
-    required: [true, 'Пожалуйста, укажите вес колонки'],
-    min: 0
+    required: [true, 'Пожалуйста, укажите вес колонки в процентах'],
+    min: 0,
+    max: 100,
+    validate: {
+      validator: function(value) {
+        return value >= 0 && value <= 100;
+      },
+      message: 'Вес должен быть в диапазоне от 0 до 100%'
+    }
   }
 });
 
@@ -81,17 +88,23 @@ TableSchema.pre('save', function(next) {
   
   // Пересчет полезности для каждого объекта
   if (this.isModified('items') || this.isModified('columns')) {
+    // Проверка суммы весов - она должна быть близка к 100%
+    const totalColumnsWeight = this.columns.reduce((sum, col) => sum + col.weight, 0);
+    const weightMultiplier = totalColumnsWeight > 0 ? 100 / totalColumnsWeight : 1;
+    
     this.items.forEach(item => {
       let totalUtility = 0;
-      let totalWeight = 0;
       
       this.columns.forEach(column => {
         const rating = item.ratings.get(column.name) || 0;
-        totalUtility += rating * column.weight;
-        totalWeight += column.weight;
+        // Используем процентный вес (приведенный к 100%)
+        // и умножаем на оценку (от 0 до 10)
+        const normalizedWeight = column.weight * weightMultiplier / 100;
+        totalUtility += rating * normalizedWeight;
       });
       
-      item.utility = totalWeight > 0 ? totalUtility / totalWeight : 0;
+      // Полезность - сумма произведений оценок на нормализованные веса
+      item.utility = totalUtility;
     });
   }
   

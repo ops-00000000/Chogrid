@@ -33,7 +33,7 @@ import { motion } from 'framer-motion';
 import { AuthContext } from '../../context/AuthContext';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
-  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
   background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
 }));
 
@@ -50,6 +50,8 @@ const NavButton = styled(Button)(({ theme }) => ({
   borderRadius: '50px',
   textTransform: 'none',
   fontWeight: 500,
+  color: '#ffffff',
+  textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
   '&:hover': {
     backgroundColor: alpha(theme.palette.common.white, 0.15),
   },
@@ -58,6 +60,11 @@ const NavButton = styled(Button)(({ theme }) => ({
 const Logo = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
+  '& .MuiTypography-root': {
+    fontWeight: 700,
+    color: '#ffffff',
+    textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+  },
   '&:hover': {
     '& .logo-icon': {
       transform: 'rotate(10deg)',
@@ -69,6 +76,8 @@ const LogoIcon = styled(TableChartIcon)(({ theme }) => ({
   marginRight: theme.spacing(1),
   fontSize: 28,
   transition: 'transform 0.3s ease',
+  color: '#ffffff',
+  filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))',
 }));
 
 const ProfileButton = styled(Button)(({ theme }) => ({

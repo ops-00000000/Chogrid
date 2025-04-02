@@ -30,7 +30,7 @@ const CreateTable = () => {
     isPublic: false,
     columns: []
   });
-  const [newColumn, setNewColumn] = useState({ name: '', weight: 1 });
+  const [newColumn, setNewColumn] = useState({ name: '', weight: 20 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -50,15 +50,25 @@ const CreateTable = () => {
     });
   };
 
+  const validateWeights = (columns) => {
+    const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
+    return Math.abs(totalWeight - 100) < 0.01;
+  };
+
   const addColumn = () => {
     if (!newColumn.name.trim()) {
       setError('Название колонки не может быть пустым');
       return;
     }
 
-    // Проверка на дублирование названий колонок
     if (tableData.columns.some(col => col.name === newColumn.name)) {
       setError('Колонка с таким названием уже существует');
+      return;
+    }
+
+    const totalWeight = tableData.columns.reduce((sum, col) => sum + col.weight, 0) + newColumn.weight;
+    if (totalWeight > 100) {
+      setError('Сумма весов не может превышать 100%. Текущая сумма: ' + totalWeight + '%');
       return;
     }
 
@@ -66,7 +76,9 @@ const CreateTable = () => {
       ...tableData,
       columns: [...tableData.columns, { ...newColumn }]
     });
-    setNewColumn({ name: '', weight: 1 });
+    const remainingWeight = 100 - (tableData.columns.length + 1) * newColumn.weight;
+    const defaultWeight = Math.min(Math.max(1, remainingWeight), 20);
+    setNewColumn({ name: '', weight: defaultWeight });
     setError(null);
   };
 
@@ -89,20 +101,24 @@ const CreateTable = () => {
       return;
     }
 
+    if (!validateWeights(tableData.columns)) {
+      setError('Сумма весов должна равняться 100%. Текущая сумма: ' + 
+        tableData.columns.reduce((sum, col) => sum + col.weight, 0).toFixed(1) + '%');
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await api.post('/tables', tableData);
       
       console.log('Ответ при создании таблицы:', response.data);
       
-      // Получаем ID созданной таблицы
       const tableId = response.data.data?._id || response.data._id;
       
       if (!tableId) {
         throw new Error('Не удалось получить ID созданной таблицы');
       }
       
-      // Исправлен путь с /tables/ на /table/
       navigate(`/table/${tableId}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Ошибка при создании таблицы');
@@ -176,13 +192,14 @@ const CreateTable = () => {
                 sx={{ flexGrow: 1, mr: 2 }}
               />
               <TextField
-                label="Вес"
+                label="Вес (%)"
                 name="weight"
                 type="number"
                 value={newColumn.weight}
                 onChange={handleColumnChange}
-                inputProps={{ min: 0.1, step: 0.1 }}
-                sx={{ width: '100px', mr: 2 }}
+                inputProps={{ min: 1, max: 100, step: 1 }}
+                sx={{ width: '120px', mr: 2 }}
+                helperText={`Сумма: ${tableData.columns.reduce((sum, col) => sum + col.weight, 0) + newColumn.weight}%`}
               />
               <Button
                 variant="contained"
@@ -200,7 +217,7 @@ const CreateTable = () => {
                   <ListItem key={index} divider>
                     <ListItemText
                       primary={column.name}
-                      secondary={`Вес: ${column.weight}`}
+                      secondary={`Вес: ${column.weight}%`}
                     />
                     <ListItemSecondaryAction>
                       <IconButton

@@ -106,7 +106,28 @@ const Footer = () => {
               transition={{ duration: 0.6, delay: 0.1 }}
               viewport={{ once: true }}
             >
-              <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 2 }}>
+              <Typography 
+                variant="h6" 
+                component="h3" 
+                sx={{ 
+                  fontWeight: 600, 
+                  mb: 2,
+                  color: '#ffffff',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                  position: 'relative',
+                  display: 'inline-block',
+                  '&:after': {
+                    content: '""',
+                    position: 'absolute',
+                    width: '40%',
+                    height: '2px',
+                    bottom: '-8px',
+                    left: 0,
+                    backgroundColor: theme.palette.secondary.main,
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
+                  }
+                }}
+              >
                 Навигация
               </Typography>
               
@@ -124,7 +145,28 @@ const Footer = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 2 }}>
+              <Typography 
+                variant="h6" 
+                component="h3" 
+                sx={{ 
+                  fontWeight: 600, 
+                  mb: 2,
+                  color: '#ffffff',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                  position: 'relative',
+                  display: 'inline-block',
+                  '&:after': {
+                    content: '""',
+                    position: 'absolute',
+                    width: '40%',
+                    height: '2px',
+                    bottom: '-8px',
+                    left: 0,
+                    backgroundColor: theme.palette.secondary.main,
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
+                  }
+                }}
+              >
                 Контакты
               </Typography>
               

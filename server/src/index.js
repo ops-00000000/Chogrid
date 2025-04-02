@@ -5,9 +5,6 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const os = require('os'); // Добавляем модуль os для получения сетевых интерфейсов
-const userRoutes = require('./routes/user.routes');
-const tableRoutes = require('./routes/table.routes');
-const authMiddleware = require('./middleware/auth.middleware');
 
 // Загрузка переменных окружения
 dotenv.config();
@@ -24,11 +21,11 @@ app.use(morgan('dev'));
 
 // Определение маршрутов
 const authRoutes = require('./routes/auth.routes');
+const tableRoutes = require('./routes/table.routes');
 
 // Routes
-app.use('/api/users', userRoutes);
-app.use('/api/tables', tableRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/tables', tableRoutes);
 
 // Тестовый маршрут
 app.get('/', (req, res) => {

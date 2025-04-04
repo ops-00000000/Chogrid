@@ -266,7 +266,7 @@ const TableView = () => {
   const TAVILY_API_KEY = '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';
   
   // Grok API ключ
-  const GROK_API_KEY = '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';
+  const GROK_API_KEY = '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';
 
   // Отслеживание состояния модального окна
   useEffect(() => {
@@ -407,7 +407,7 @@ const TableView = () => {
           // Устанавливаем загруженные примечания
           if (Object.keys(notesMap).length > 0) {
             console.log('Загружены примечания к характеристикам:', notesMap);
-            setColumnNotes(notesMap);
+            setNotes(notesMap);
           }
         }
         
@@ -605,7 +605,7 @@ const TableView = () => {
   const handleDeleteObject = async (objectId) => {
     if (window.confirm('Вы уверены, что хотите удалить этот объект?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('authToken');
         if (!token) {
           toast.error('Ошибка авторизации. Пожалуйста, войдите заново');
           navigate('/login');
@@ -614,7 +614,7 @@ const TableView = () => {
 
         await axios.delete(`${BASE_URL}/api/tables/${id}/items/${objectId}`, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           }
         });
 
@@ -635,7 +635,7 @@ const TableView = () => {
 
   // Вычисление полезности объекта
   const getUtility = (item) => {
-    if (!item.ratings || !tableData.columns) return 0;
+    if (!item || !tableData.columns) return 0;
     
     let totalUtility = 0;
     
@@ -644,13 +644,11 @@ const TableView = () => {
     
     tableData.columns.forEach(column => {
       const weight = column.weight || 1;
-      const rating = item.ratings[column.name];
+      const rating = getRating(item, column.name);
       
-      if (rating !== undefined) {
-        // Нормализуем вес (сумма весов = 1) и умножаем на оценку
-        const normalizedWeight = totalColumnsWeight > 0 ? weight / totalColumnsWeight : 0;
-        totalUtility += rating * normalizedWeight;
-      }
+      // Нормализуем вес (сумма весов = 1) и умножаем на оценку
+      const normalizedWeight = totalColumnsWeight > 0 ? weight / totalColumnsWeight : 0;
+      totalUtility += rating * normalizedWeight;
     });
     
     // Полезность теперь в диапазоне от 0 до 10
@@ -715,44 +713,69 @@ const TableView = () => {
     setEditValue(e.target.value);
   };
 
-  // Функция для получения примечания, сначала из ratings объекта, затем из локального хранилища
+  // Функция для получения рейтинга, с проверкой всех возможных источников
+  const getRating = (item, columnName) => {
+    if (!item || !item._id) return 0;
+    
+    // Сначала проверяем, есть ли рейтинг в объекте
+    if (item.ratings && typeof item.ratings[columnName] === 'number') {
+      return item.ratings[columnName];
+    }
+    
+    // Если рейтинга нет в объекте, проверяем localStorage
+    try {
+      const ratingKey = `rating_${item._id}_${columnName}`;
+      const savedRating = localStorage.getItem(ratingKey);
+      if (savedRating && !isNaN(parseFloat(savedRating))) {
+        return parseFloat(savedRating);
+      }
+    } catch (e) {
+      console.error('Ошибка при чтении рейтинга из localStorage:', e);
+    }
+    
+    return 0; // Возвращаем 0, если рейтинг не найден
+  };
+
+  // Отладочная функция для проверки примечаний в localStorage
+  const debugNotesInLocalStorage = () => {
+    console.log('=== ОТЛАДКА ПРИМЕЧАНИЙ В LOCALSTORAGE ===');
+    
+    const allKeys = Object.keys(localStorage);
+    const noteKeys = allKeys.filter(key => key.includes('-'));
+    
+    console.log(`Найдено ${noteKeys.length} ключей с примечаниями:`, noteKeys);
+    
+    for (const key of noteKeys) {
+      const value = localStorage.getItem(key);
+      console.log(`Примечание: ${key} = ${value}`);
+    }
+    
+    console.log('=== КОНЕЦ ОТЛАДКИ ===');
+  };
+  
+  // Улучшенная функция для получения примечания
   const getColumnNote = (item, columnName) => {
     if (!item || !item._id) return '';
     
-    // Проверяем все возможные места хранения примечаний
-    
-    // 1. Сначала пробуем получить из ratings объекта
-    if (item.ratings && item.ratings[`note_${columnName}`] !== null && item.ratings[`note_${columnName}`] !== undefined) {
-      return item.ratings[`note_${columnName}`];
+    // Отладочная информация
+    if (!window.notesDebugged) {
+      debugNotesInLocalStorage();
+      window.notesDebugged = true;
     }
     
-    // 2. Проверяем columnNotes
-    if (item.columnNotes && item.columnNotes[columnName] !== null && item.columnNotes[columnName] !== undefined) {
-      return item.columnNotes[columnName];
-    }
-    
-    // 3. Проверяем notes
-    if (item.notes && item.notes[columnName] !== null && item.notes[columnName] !== undefined) {
-      return item.notes[columnName];
-    }
-    
-    // 4. Проверяем прямое поле с note_ префиксом
-    if (item[`note_${columnName}`] !== null && item[`note_${columnName}`] !== undefined) {
-      return item[`note_${columnName}`];
-    }
-    
-    // 5. Пробуем получить из локального хранилища
+    // Пробуем получить из локального хранилища
     try {
-      const notesStr = localStorage.getItem(NOTES_STORAGE_KEY);
-      if (notesStr) {
-        const notes = JSON.parse(notesStr);
-        const noteKey = `${item._id}-${columnName}`;
-        if (notes[noteKey]) {
-          return notes[noteKey];
-        }
+      const noteKey = `${item._id}-${columnName}`;
+      const noteValue = localStorage.getItem(noteKey);
+      
+      if (noteValue) {
+        console.log(`Найдено примечание по ключу ${noteKey}: ${noteValue}`);
+        return noteValue;
+      } else {
+        console.log(`Примечание не найдено по ключу ${noteKey}`);
       }
     } catch (e) {
-      console.error('Ошибка при чтении примечаний из localStorage:', e);
+      console.error('Ошибка при чтении примечания из localStorage:', e);
     }
     
     return '';
@@ -796,49 +819,46 @@ const TableView = () => {
     return {};
   };
 
-  // Упрощаю функцию handleSaveEdit для примечаний, делая ее идентичной обработке характеристик
+  // Функция для сохранения изменений при редактировании
   const handleSaveEdit = async (e) => {
-    if (e.key === 'Enter' && editingCell) {
-      if (e.preventDefault && typeof e.preventDefault === 'function') {
-        e.preventDefault();
-      }
-      
+    if (e.key === 'Enter') {
       try {
-        const {itemId, field} = editingCell;
-        console.log('Сохраняем правку для поля:', field);
+        // Проверяем, что редактирование активно
+        if (!editingCell) return;
         
-        // Получаем элемент из таблицы
+        const { itemId, field } = editingCell;
+        console.log(`Сохраняем изменения для элемента ${itemId}, поле ${field}, значение: ${editValue}`);
+        
         const item = tableData.items.find(i => i._id === itemId);
         if (!item) {
+          console.error(`Элемент с ID ${itemId} не найден`);
           toast.error('Элемент не найден');
+          setEditingCell(null);
           return;
         }
         
         let updateData = {};
         
-        if (field === 'name' || field === 'cost' || field === 'description') {
-          // Поля верхнего уровня
-          updateData[field] = field === 'cost' ? parseFloat(editValue) : editValue;
-        } else if (field.startsWith('note_')) {
-          // Примечания - обрабатываем их ТОЧНО ТАК ЖЕ, как характеристики, только внутри ratings
-          // Сначала сохраняем в localStorage для локальной копии
-          const columnName = field.replace('note_', '');
-          saveNoteToLocalStorage(itemId, columnName, editValue);
+        // Обработка примечаний (полей с префиксом note_)
+        if (field.startsWith('note_')) {
+          console.log('Сохраняем примечание:', editValue);
+          
+          // Получаем имя колонки, удаляя префикс note_
+          const columnName = field.substring(5);
+          
+          // Сохраняем примечание в localStorage
+          const noteKey = `${itemId}-${columnName}`;
+          localStorage.setItem(noteKey, editValue);
           
           // Сразу обновляем локальное состояние интерфейса
-          setColumnNotes(prev => ({
+          setNotes(prev => ({
             ...prev,
-            [`${itemId}-${columnName}`]: editValue
+            [noteKey]: editValue
           }));
           
-          // Обновляем ratings ТОЧНО ТАК ЖЕ, как для обычных характеристик
-          updateData = {
-            ratings: { ...(item.ratings || {}) }
-          };
-          // Добавляем примечание с префиксом note_ в ratings
-          updateData.ratings[field] = editValue;
-          
-          console.log('Обновляем ratings с примечанием:', updateData);
+          toast.success('Примечание сохранено');
+          setEditingCell(null);
+          return;
         } else {
           // Обычные характеристики
           let updatedValue = parseFloat(editValue);
@@ -852,37 +872,61 @@ const TableView = () => {
             ratings: { ...item.ratings }
           };
           updateData.ratings[field] = updatedValue;
+          
+          // Сохраняем рейтинг локально
+          const ratingKey = `rating_${itemId}_${field}`;
+          localStorage.setItem(ratingKey, updatedValue.toString());
         }
         
-        // Отправляем запрос на обновление - ОДИНАКОВЫЙ для всех типов полей
-        const response = await axios.put(
-          `${BASE_URL}/api/tables/${id}/items/${itemId}`,
-          updateData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+        // Отправляем запрос на обновление - ТОЛЬКО для рейтингов (не примечаний)
+        try {
+          const response = await axios.put(
+            `${BASE_URL}/api/tables/${id}/items/${itemId}`,
+            updateData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+              }
             }
-          }
-        );
-        
-        console.log('Успешный ответ сервера:', response.data);
-        
-        // Обновляем данные таблицы
-        await fetchTable();
-        
-        // Показываем сообщение об успехе
-        if (field.startsWith('note_')) {
-          toast.success('Примечание сохранено');
-        } else {
+          );
+          
+          console.log('Успешный ответ сервера:', response.data);
+          
+          // Обновляем данные таблицы
+          await fetchTable();
+          
           toast.success('Значение обновлено');
+        } catch (updateError) {
+          console.error('Ошибка обновления на сервере:', updateError);
+          console.error('Детали ошибки:', updateError.response?.data);
+          
+          toast.warning('Ошибка при обновлении на сервере, изменения сохранены только локально');
+          
+          // Обновляем локальные данные, чтобы изменения были видны пользователю
+          const updatedItems = tableData.items.map(i => {
+            if (i._id === itemId) {
+              return {
+                ...i,
+                ratings: {
+                  ...(i.ratings || {}),
+                  [field]: parseFloat(editValue)
+                }
+              };
+            }
+            return i;
+          });
+          
+          setTableData(prev => ({
+            ...prev,
+            items: updatedItems
+          }));
         }
         
         // Сбрасываем состояние редактирования
         setEditingCell(null);
       } catch (err) {
-        console.error('Ошибка обновления:', err);
-        console.error('Детали ошибки:', err.response?.data);
+        console.error('Общая ошибка обновления:', err);
         toast.error('Ошибка при обновлении значения');
         setEditingCell(null);
       }
@@ -1025,7 +1069,7 @@ const TableView = () => {
       console.log('Начинаем процесс удаления таблицы:', id);
       
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('authToken');
         
         if (!token) {
           console.error('Токен авторизации не найден');
@@ -1143,7 +1187,7 @@ const TableView = () => {
     
     if (Object.keys(localNotes).length > 0) {
       console.log('Загружены примечания из localStorage:', localNotes);
-      setColumnNotes(prev => ({ ...prev, ...localNotes }));
+      setNotes(prev => ({ ...prev, ...localNotes }));
     }
   }, []);
 
@@ -1175,7 +1219,7 @@ const TableView = () => {
       
       // Добавляем все характеристики в данные
       tableData.columns.forEach(column => {
-        data[column.name] = item.ratings?.[column.name] || 0;
+        data[column.name] = getRating(item, column.name);
       });
       
       return data;
@@ -1938,7 +1982,7 @@ const TableView = () => {
       setGenerationStep('Проверка авторизации...');
       
       // Проверяем авторизацию
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       if (!token) {
         toast.error('Необходимо авторизоваться для генерации таблицы');
         setGeneratingTable(false);
@@ -2005,6 +2049,9 @@ const TableView = () => {
             console.log('Доступные рейтинги в объекте:', Object.keys(item.ratings));
           }
           
+          // Сохраняем примечания, чтобы использовать их после создания объекта
+          const itemNotes = { ...item.notes };
+          
           // Создаем объект для рейтингов, содержащий ТОЛЬКО числовые оценки
           const ratings = {};
           
@@ -2055,90 +2102,87 @@ const TableView = () => {
             {
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
               }
             }
           );
           
           console.log('Ответ при добавлении объекта:', addResponse.data);
           
-          // Если объект был успешно добавлен, сохраняем примечания в localStorage
+          // Если объект был успешно добавлен
           if (addResponse.data && addResponse.data.success) {
-            const itemId = addResponse.data.data._id;
+            // Извлекаем реальный ID элемента из ответа
+            let newItemId;
             
-            // Обрабатываем примечания из объекта notes
-            if (item.notes) {
-              console.log('Сохраняем примечания для объекта:', Object.keys(item.notes));
+            // Изучаем структуру ответа для правильного извлечения ID
+            console.log('Детальная структура ответа:', JSON.stringify(addResponse.data, null, 2));
+            
+            // Проверяем, есть ли новый элемент в items массиве
+            if (addResponse.data.data && addResponse.data.data.items && addResponse.data.data.items.length > 0) {
+              // Берем ID последнего добавленного элемента
+              const lastItem = addResponse.data.data.items[addResponse.data.data.items.length - 1];
+              newItemId = lastItem._id;
+              console.log('ID извлечен из последнего элемента в массиве items:', newItemId);
+            } 
+            // Старые проверки
+            else if (addResponse.data.data && addResponse.data.data._id) {
+              newItemId = addResponse.data.data._id;
+              console.log('ID извлечен из data._id:', newItemId);
+            } else if (addResponse.data.item && addResponse.data.item._id) {
+              newItemId = addResponse.data.item._id;
+              console.log('ID извлечен из item._id:', newItemId);
+            } else {
+              console.error('Не удалось извлечь ID элемента из ответа:', addResponse.data);
+              continue; // Переходим к следующему элементу
+            }
+            
+            console.log('Извлечен ID нового элемента:', newItemId);
+            
+            // Обрабатываем примечания для каждой колонки, используя подход из ручного редактирования
+            for (const columnName of columnNames) {
+              // Ищем примечание для этой колонки
+              let noteText = null;
               
-              for (let i = 0; i < columnNames.length; i++) {
-                const columnName = columnNames[i];
-                const cleanName = cleanColumnNames[i];
-                
-                // Ищем примечание с учетом разных вариантов названия колонки
-                let noteText = null;
-                
-                // 1. Сначала проверяем точное совпадение
-                if (item.notes[columnName]) {
-                  noteText = item.notes[columnName];
-                }
-                // 2. Проверяем по очищенному имени
-                else if (item.notes[cleanName]) {
-                  noteText = item.notes[cleanName];
-                } 
-                // 3. Ищем среди всех примечаний подходящее
-                else {
-                  for (const noteKey of Object.keys(item.notes)) {
-                    const normalizedNoteKey = normalizeColumnName(noteKey);
-                    const normalizedColumnName = normalizeColumnName(cleanName);
-                    
-                    if (normalizedNoteKey === normalizedColumnName || 
-                        normalizedNoteKey.includes(normalizedColumnName) || 
-                        normalizedColumnName.includes(normalizedNoteKey)) {
-                      noteText = item.notes[noteKey];
-                      console.log(`Найдено соответствие для примечания: "${columnName}" -> "${noteKey}"`);
-                      break;
-                    }
-                  }
-                }
-                
-                // Если нашли примечание, сохраняем его
-                if (noteText) {
-                  try {
-                    // Сохраняем примечание в localStorage
-                    console.log(`Сохраняем примечание для ${itemId}-${columnName}:`, noteText);
-                    localStorage.setItem(`${itemId}-${columnName}`, noteText);
-                    
-                    // Обновляем объект примечаний в состоянии
-                    setNotes(prev => ({
-                      ...prev,
-                      [`${itemId}-${columnName}`]: noteText
-                    }));
-                  } catch (noteError) {
-                    console.error('Ошибка при сохранении примечания:', noteError);
+              // Проверяем все возможные места хранения примечаний
+              if (itemNotes && itemNotes[columnName]) {
+                noteText = itemNotes[columnName];
+              } else if (itemNotes && itemNotes[cleanColumnName(columnName)]) {
+                noteText = itemNotes[cleanColumnName(columnName)];
+              } else {
+                // Ищем соответствие через нормализацию названий
+                for (const noteKey of Object.keys(itemNotes || {})) {
+                  const normalizedNoteKey = normalizeColumnName(noteKey);
+                  const normalizedColumnName = normalizeColumnName(columnName);
+                  
+                  if (normalizedNoteKey === normalizedColumnName || 
+                      normalizedNoteKey.includes(normalizedColumnName) || 
+                      normalizedColumnName.includes(normalizedNoteKey)) {
+                    noteText = itemNotes[noteKey];
+                    console.log(`Найдено соответствие для примечания: "${columnName}" -> "${noteKey}"`);
+                    break;
                   }
                 }
               }
-            }
-            
-            // Для обратной совместимости также проверяем примечания в ratings
-            if (item.ratings) {
-              for (const columnName of columnNames) {
-                const noteKey = `note_${columnName}`;
-                if (item.ratings[noteKey]) {
-                  try {
-                    // Сохраняем примечание в localStorage
-                    const noteValue = item.ratings[noteKey];
-                    console.log(`Сохраняем примечание из ratings для ${itemId}-${columnName}:`, noteValue);
-                    localStorage.setItem(`${itemId}-${columnName}`, noteValue);
-                    
-                    // Обновляем объект примечаний в состоянии
-                    setNotes(prev => ({
-                      ...prev,
-                      [`${itemId}-${columnName}`]: noteValue
-                    }));
-                  } catch (noteError) {
-                    console.error('Ошибка при сохранении примечания из ratings:', noteError);
-                  }
+              
+              // Если нашли примечание, сохраняем его ТОЧНО ТАК ЖЕ, как при ручном редактировании
+              if (noteText) {
+                try {
+                  console.log(`Сохраняем примечание для элемента ${newItemId}, колонка ${columnName}:`, noteText);
+                  
+                  // Сохраняем в localStorage для локального отображения
+                  const noteKey = `${newItemId}-${columnName}`;
+                  localStorage.setItem(noteKey, noteText);
+                  
+                  // Обновляем состояние компонента 
+                  setNotes(prev => ({
+                    ...prev,
+                    [noteKey]: noteText
+                  }));
+                  
+                  console.log(`Примечание сохранено с ключом ${noteKey}`);
+                } catch (noteError) {
+                  console.error(`Ошибка при сохранении примечания для элемента ${newItemId}, колонка ${columnName}:`, noteError);
+                  // Несмотря на ошибку, пытаемся продолжить с другими примечаниями
                 }
               }
             }
@@ -2188,6 +2232,106 @@ const TableView = () => {
       toast.error('Не удалось сгенерировать таблицу');
       setGeneratingTable(false);
     }
+  };
+
+  // @desc    Обновление объекта в таблице
+  // @route   PUT /api/tables/:id/items/:itemId
+  // @access  Private
+  const updateItem = async (tableId, itemId, itemData) => {
+    try {
+      console.log(`Отправка запроса на обновление элемента: 
+        URL: ${BASE_URL}/api/tables/${tableId}/items/${itemId}
+        ID таблицы: ${tableId}
+        ID элемента: ${itemId}
+        Данные:`, itemData);
+      
+      const config = {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      };
+      
+      const response = await axios.put(
+        `${BASE_URL}/api/tables/${tableId}/items/${itemId}`,
+        itemData,
+        config
+      );
+      
+      console.log('Ответ сервера при обновлении элемента:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('Ошибка при обновлении элемента:', error);
+      console.log('Детали ошибки:', error.response);
+      throw error;
+    }
+  };
+
+  // Функция для восстановления примечаний с неправильными ключами
+  const fixBrokenNotes = () => {
+    console.log('Начинаем исправление примечаний...');
+    
+    // Получаем все ключи из localStorage
+    const allKeys = Object.keys(localStorage);
+    
+    // Получаем ID таблицы
+    const tableId = id;
+    
+    // Находим ключи с примечаниями, которые используют ID таблицы вместо ID элементов
+    const brokenNoteKeys = allKeys.filter(key => key.startsWith(`${tableId}-`));
+    
+    console.log(`Найдено ${brokenNoteKeys.length} неправильных ключей с примечаниями:`, brokenNoteKeys);
+    
+    if (brokenNoteKeys.length === 0) {
+      console.log('Неправильных ключей не найдено.');
+      toast.info('Неправильных ключей не найдено');
+      return;
+    }
+    
+    // Получаем текущие элементы таблицы
+    const tableItems = tableData?.items || [];
+    
+    if (tableItems.length === 0) {
+      console.log('В таблице нет элементов.');
+      toast.warning('В таблице нет элементов');
+      return;
+    }
+    
+    console.log('Текущие элементы таблицы:', tableItems);
+    
+    // Для каждого неправильного ключа
+    for (const brokenKey of brokenNoteKeys) {
+      try {
+        // Извлекаем значение и колонку из ключа
+        const value = localStorage.getItem(brokenKey);
+        const columnName = brokenKey.split('-')[1];
+        
+        console.log(`Обрабатываем ключ ${brokenKey}, колонка: ${columnName}, значение: ${value}`);
+        
+        // Создаем новые ключи для всех элементов
+        for (const item of tableItems) {
+          const newKey = `${item._id}-${columnName}`;
+          localStorage.setItem(newKey, value);
+          console.log(`Создан новый ключ ${newKey} со значением: ${value}`);
+        }
+        
+        // Удаляем старый ключ
+        localStorage.removeItem(brokenKey);
+        console.log(`Удален старый ключ ${brokenKey}`);
+      } catch (e) {
+        console.error(`Ошибка при обработке ключа ${brokenKey}:`, e);
+      }
+    }
+    
+    console.log('Исправление примечаний завершено.');
+    toast.success('Примечания восстановлены');
+    
+    // Сбрасываем флаг отладки, чтобы увидеть новый вывод
+    window.notesDebugged = false;
+    
+    // Перезагружаем таблицу
+    fetchTable();
   };
 
   if (loading) {
@@ -2260,6 +2404,14 @@ const TableView = () => {
                   color="secondary"
                 >
                   Автогенерация
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  onClick={fixBrokenNotes}
+                  startIcon={<AutoFixHighIcon />}
+                  color="warning"
+                >
+                  Исправить примечания
                 </Button>
               </>
             )}
@@ -2397,7 +2549,7 @@ const TableView = () => {
                       {/* Ячейка со значением характеристики */}
                       <StyledTableCell 
                         editable={isOwner ? 'true' : 'false'}
-                        onClick={() => handleCellClick(item._id, column.name, item.ratings && item.ratings[column.name])}
+                        onClick={() => handleCellClick(item._id, column.name, getRating(item, column.name))}
                       >
                         {editingCell && editingCell.itemId === item._id && editingCell.field === column.name ? (
                           <TextField
@@ -2411,9 +2563,7 @@ const TableView = () => {
                             variant="standard"
                           />
                         ) : (
-                          (item.ratings && item.ratings[column.name] !== undefined) ? 
-                            item.ratings[column.name] : 
-                            '-'
+                          getRating(item, column.name) || '-'
                         )}
                       </StyledTableCell>
                       

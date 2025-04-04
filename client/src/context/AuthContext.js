@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   // Инициализация аутентификации при загрузке
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       
       console.log('Проверка авторизации, токен:', token ? 'Присутствует' : 'Отсутствует');
       
@@ -42,12 +42,12 @@ export const AuthProvider = ({ children }) => {
             console.log('Пользователь аутентифицирован:', userData);
           } else {
             console.error('Получены некорректные данные пользователя');
-            localStorage.removeItem('token');
+            localStorage.removeItem('authToken');
             delete axios.defaults.headers.common['Authorization'];
           }
         } catch (err) {
           console.error('Ошибка при авторизации:', err);
-          localStorage.removeItem('token');
+          localStorage.removeItem('authToken');
           delete axios.defaults.headers.common['Authorization'];
         }
       } else {
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
       console.log('Ответ при регистрации:', res.data);
       
       if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('authToken', res.data.token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
         
         // Обеспечиваем наличие _id, если имеется только id
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       console.log('Ответ при входе:', res.data);
       
       if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('authToken', res.data.token);
         axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
         
         // Обеспечиваем наличие _id, если имеется только id
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   
   // Функция для выхода
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
     setIsAuthenticated(false);
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }) => {
   
   // Функция для обновления токена
   const refreshAuth = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     if (token) {
       try {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;

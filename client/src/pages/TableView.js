@@ -463,32 +463,55 @@ const TableView = () => {
     }
   };
 
+  // Функция для открытия модального окна добавления объекта
   const handleOpenModal = () => {
-    if (!isAuthenticated) {
-      toast.warning('Необходимо войти в систему для добавления объектов');
-      navigate('/login');
-      return;
+    try {
+      console.log('Открываем модальное окно добавления объекта');
+      
+      // Проверяем авторизацию
+      if (!isAuthenticated) {
+        toast.warning('Необходимо войти в систему для добавления объектов');
+        navigate('/login');
+        return;
+      }
+      
+      // Проверяем, что данные таблицы загружены
+      if (!tableData || !tableData.columns || tableData.columns.length === 0) {
+        console.error('Таблица не содержит характеристик:', tableData);
+        toast.error('Таблица не содержит характеристик. Сначала добавьте характеристики.');
+        return;
+      }
+      
+      // Инициализируем пустую форму с основными полями
+      const initialFormData = {
+        name: '',
+        cost: '',
+        description: ''
+      };
+      
+      // Добавляем пустые поля для всех характеристик
+      if (tableData.columns && tableData.columns.length > 0) {
+        tableData.columns.forEach(column => {
+          if (column._id) {
+            initialFormData[column._id] = '';
+          }
+        });
+      }
+      
+      // Устанавливаем начальные данные формы
+      setFormData(initialFormData);
+      
+      // Очищаем любые предыдущие ошибки
+      setFormErrors({});
+      
+      console.log('Инициализированные данные формы:', initialFormData);
+      
+      // Открываем модальное окно
+      setModalOpen(true);
+    } catch (error) {
+      console.error('Ошибка при открытии модального окна:', error);
+      toast.error('Произошла ошибка при открытии формы добавления объекта');
     }
-    
-    // Создаем пустой объект с полями для каждого критерия
-    const initialFormData = {};
-    
-    if (tableData && tableData.columns) {
-      tableData.columns.forEach(column => {
-        initialFormData[column._id] = '';
-      });
-    }
-    
-    setFormData({
-      name: '',
-      cost: '',
-      description: '',
-      ...initialFormData
-    });
-    setFormErrors({});
-    console.log('Открываем модальное окно, setModalOpen(true)');
-    setModalOpen(true);
-    console.log('Состояние modalOpen после установки:', true);
   };
 
   const handleCloseModal = () => {
@@ -1193,7 +1216,32 @@ const TableView = () => {
 
   // Функция для открытия модального окна аналитики
   const handleOpenAnalytics = () => {
-    setAnalyticsOpen(true);
+    try {
+      console.log('Открываем модальное окно аналитики');
+      
+      // Проверяем, что у нас есть данные для отображения
+      if (!tableData || !tableData.items || tableData.items.length === 0) {
+        console.error('Таблица не содержит объектов для анализа:', tableData);
+        toast.error('Таблица не содержит объектов для анализа. Сначала добавьте объекты.');
+        return;
+      }
+      
+      // Проверяем наличие характеристик
+      if (!tableData.columns || tableData.columns.length === 0) {
+        console.error('Таблица не содержит характеристик для анализа:', tableData);
+        toast.error('Таблица не содержит характеристик для анализа. Сначала добавьте характеристики.');
+        return;
+      }
+      
+      // Устанавливаем активную вкладку на первую
+      setActiveTab(0);
+      
+      // Открываем модальное окно аналитики
+      setAnalyticsOpen(true);
+    } catch (error) {
+      console.error('Ошибка при открытии аналитики:', error);
+      toast.error('Произошла ошибка при открытии аналитики');
+    }
   };
 
   // Функция для закрытия модального окна аналитики
@@ -1208,43 +1256,64 @@ const TableView = () => {
 
   // Функция для получения данных для гистограммы сравнения объектов
   const getComparisonChartData = () => {
-    if (!tableData || !tableData.items || tableData.items.length === 0) return [];
-    
-    return tableData.items.map(item => {
-      const data = {
-        name: item.name,
-        utility: getUtility(item) || 0,
-        cost: item.cost || 0
-      };
+    try {
+      if (!tableData || !tableData.columns || !tableData.items || tableData.items.length === 0) {
+        console.log('Нет данных для построения графика сравнения');
+        return [];
+      }
       
-      // Добавляем все характеристики в данные
-      tableData.columns.forEach(column => {
-        data[column.name] = getRating(item, column.name);
-      });
+      const labels = tableData.columns.map(column => column.name);
+      const datasets = [];
       
-      return data;
-    });
+      // Создаем набор данных для каждого элемента
+      for (let i = 0; i < tableData.items.length; i++) {
+        const item = tableData.items[i];
+        const color = COLORS[i % COLORS.length];
+        
+        const dataset = {
+          name: item.name,
+          utility: getUtility(item) || 0,
+          cost: item.cost || 0
+        };
+        
+        // Добавляем все характеристики в данные
+        tableData.columns.forEach(column => {
+          dataset[column.name] = getRating(item, column.name);
+        });
+        
+        datasets.push(dataset);
+      }
+      
+      return datasets;
+    } catch (error) {
+      console.error('Ошибка при формировании данных для гистограммы сравнения:', error);
+      return [];
+    }
   };
 
   // Функция для получения данных для радарной диаграммы
   const getRadarChartData = () => {
-    if (!tableData || !tableData.items || tableData.items.length === 0) return [];
-    
-    const items = tableData.items;
-    const columns = tableData.columns;
-    
-    // Подготовка данных для радарной диаграммы
-    return columns.map(column => {
-      const data = { 
-        characteristic: column.name,
-      };
+    try {
+      if (!tableData || !tableData.columns || !tableData.items || tableData.items.length === 0) {
+        console.log('Нет данных для построения радарной диаграммы');
+        return [];
+      }
       
-      items.forEach(item => {
-        data[item.name] = item.ratings?.[column.name] || 0;
+      return tableData.columns.map(column => {
+        const data = { 
+          characteristic: column.name,
+        };
+        
+        tableData.items.forEach(item => {
+          data[item.name] = getRating(item, column.name);
+        });
+        
+        return data;
       });
-      
-      return data;
-    });
+    } catch (error) {
+      console.error('Ошибка при формировании данных для радарной диаграммы:', error);
+      return [];
+    }
   };
 
   // Функция для получения данных для круговой диаграммы
@@ -1281,6 +1350,13 @@ const TableView = () => {
     }
     
     try {
+      // Проверяем, что у нас есть tableData и columns
+      if (!tableData) {
+        console.error('tableData отсутствует');
+        toast.error('Ошибка при доступе к данным таблицы');
+        return;
+      }
+      
       // Клонируем текущие колонки таблицы
       const updatedColumns = [...(tableData.columns || [])];
       
@@ -1289,6 +1365,8 @@ const TableView = () => {
         name: newColumnName,
         weight: parseInt(newColumnWeight, 10) || 10
       });
+      
+      console.log('Отправляем запрос на обновление таблицы с колонками:', updatedColumns);
       
       // Отправляем запрос на обновление таблицы
       await axios.put(`${BASE_URL}/api/tables/${id}`, {
@@ -1311,6 +1389,10 @@ const TableView = () => {
       toast.success('Характеристика успешно добавлена');
     } catch (err) {
       console.error('Ошибка при добавлении характеристики:', err);
+      if (err.response) {
+        console.error('Статус ошибки:', err.response.status);
+        console.error('Данные ошибки:', err.response.data);
+      }
       toast.error('Не удалось добавить характеристику');
     }
   };

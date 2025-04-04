@@ -1214,7 +1214,7 @@ const TableView = () => {
     }
   }, []);
 
-  // Функция для открытия модального окна аналитики
+  // Функция для открытия модального окна аналитики с дополнительной проверкой безопасности
   const handleOpenAnalytics = () => {
     try {
       console.log('Открываем модальное окно аналитики');
@@ -1236,8 +1236,12 @@ const TableView = () => {
       // Устанавливаем активную вкладку на первую
       setActiveTab(0);
       
-      // Открываем модальное окно аналитики
-      setAnalyticsOpen(true);
+      // Используем setTimeout, чтобы отложить открытие модального окна на следующий тик,
+      // это помогает избежать проблем с доступом к DOM
+      setTimeout(() => {
+        // Открываем модальное окно аналитики
+        setAnalyticsOpen(true);
+      }, 0);
     } catch (error) {
       console.error('Ошибка при открытии аналитики:', error);
       toast.error('Произошла ошибка при открытии аналитики');
@@ -2696,285 +2700,388 @@ const TableView = () => {
       </TableBox>
       
       {/* Модальное окно для добавления новой колонки */}
-      <Dialog
-        open={showAddColumnForm}
-        onClose={() => setShowAddColumnForm(false)}
-        maxWidth="sm"
-        fullWidth
-        disablePortal
-        disableEnforceFocus
-        keepMounted
-        sx={{ zIndex: 1300 }}
-      >
-        <DialogTitle>
-          Добавление новой характеристики
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Название характеристики"
-            value={newColumnName}
-            onChange={(e) => setNewColumnName(e.target.value)}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="Вес (важность)"
-            type="number"
-            value={newColumnWeight}
-            onChange={(e) => setNewColumnWeight(e.target.value)}
-            margin="normal"
-            inputProps={{ min: 0, max: 100 }}
-            helperText="Чем больше вес, тем больше влияние на общую полезность (от 0 до 100)"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowAddColumnForm(false)}>
-            Отмена
-          </Button>
-          <Button variant="contained" color="primary" onClick={handleAddColumn}>
-            Добавить
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Модальное окно для аналитики - используем Dialog вместо Backdrop */}
-      <Dialog
-        open={analyticsOpen}
-        onClose={handleCloseAnalytics}
-        maxWidth="xl"
-        fullWidth
-        disablePortal
-        disableEnforceFocus
-        keepMounted
-        sx={{ zIndex: 1300 }}
-        PaperProps={{
-          sx: {
-            maxHeight: '90vh',
-            width: '90%',
-            maxWidth: '1200px',
-            m: 'auto',
-            p: 3,
-            overflowY: 'auto',
-          }
-        }}
-      >
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          mb: 3 
-        }}>
-          <Typography variant="h5" component="h2">
-            Аналитика: {tableData?.name}
-          </Typography>
-          <IconButton onClick={handleCloseAnalytics}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
-        
-        <Tabs 
-          value={activeTab} 
-          onChange={handleTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab icon={<BarChartIcon />} label="Сравнение объектов" />
-          <Tab icon={<InsightsIcon />} label="Радар характеристик" />
-          <Tab icon={<PieChartIcon />} label="Вес критериев" />
-          <Tab icon={<TrendingUpIcon />} label="Эффективность (польза/стоимость)" />
-        </Tabs>
-        
-        {/* Вкладка 1: Гистограмма сравнения объектов */}
-        {activeTab === 0 && (
-          <>
-            <Typography variant="h6" gutterBottom>
-              Сравнение объектов по общей полезности и характеристикам
-            </Typography>
-            <Box sx={{ height: 550, mb: 4 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={getComparisonChartData()}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45} 
-                    textAnchor="end" 
-                    height={80}
-                    interval={0}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis />
-                  <RechartsTooltip 
-                    formatter={(value, name) => [`${value}`, name]}
-                    contentStyle={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      padding: '10px'
-                    }}
-                  />
-                  <Legend 
-                    verticalAпlign="top" 
-                    wrapperStyle={{ 
-                      paddingBottom: 20,
-                      fontSize: 12
-                    }}
-                  />
-                  <Bar dataKey="utility" fill="#8884d8" name="Общая полезность" strokeWidth={2} stroke="#6c60c9" />
-                  <Bar dataKey="cost" fill="#82ca9d" name="Стоимость" opacity={0.7} />
-                  {tableData?.columns.map((column, index) => (
-                    <Bar 
-                      key={column.name} 
-                      dataKey={column.name} 
-                      fill={COLORS[index % COLORS.length]} 
-                      name={column.name}
-                      opacity={0.8}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </>
-        )}
-        
-        {/* Вкладка 2: Радарная диаграмма */}
-        {activeTab === 1 && (
-          <>
-            <Typography variant="h6" gutterBottom>
-              Сравнение объектов по отдельным характеристикам (радар)
-            </Typography>
-            <Box sx={{ height: 400, mb: 4 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart 
-                  cx="50%" 
-                  cy="50%" 
-                  outerRadius="80%" 
-                  data={getRadarChartData()}
-                >
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="characteristic" />
-                  <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                  {tableData?.items.map((item, index) => (
-                    <Radar 
-                      key={item._id} 
-                      name={item.name} 
-                      dataKey={item.name} 
-                      stroke={COLORS[index % COLORS.length]} 
-                      fill={COLORS[index % COLORS.length]} 
-                      fillOpacity={0.2} 
-                    />
-                  ))}
-                  <Legend />
-                  <RechartsTooltip />
-                </RadarChart>
-              </ResponsiveContainer>
-            </Box>
-          </>
-        )}
-        
-        {/* Вкладка 3: Круговая диаграмма весов критериев */}
-        {activeTab === 2 && (
-          <>
-            <Typography variant="h6" gutterBottom>
-              Распределение весов критериев оценки
-            </Typography>
-            <Box sx={{ height: 400, mb: 4 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={getPieChartData()}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    outerRadius={150}
-                    fill="#8884d8"
-                    dataKey="value"
-                    nameKey="name"
-                    label={(entry) => entry.name}
-                  >
-                    {getPieChartData().map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip formatter={(value) => [`${value}%`, 'Вес']} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Box>
-          </>
-        )}
-        
-        {/* Вкладка 4: Диаграмма соотношения полезности к стоимости */}
-        {activeTab === 3 && (
-          <>
-            <Typography variant="h6" gutterBottom>
-              Эффективность объектов (соотношение полезности к стоимости)
-            </Typography>
-            <Box sx={{ height: 400, mb: 4 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={getUtilityToCostData()}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
-                  layout="vertical"
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={150} />
-                  <RechartsTooltip 
-                    formatter={(value) => [`${value.toFixed(4)}`, 'Эффективность']} 
-                  />
-                  <Legend />
-                  <Bar 
-                    dataKey="value" 
-                    fill="#8884d8" 
-                    name="Польза / Стоимость" 
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              * Чем выше значение, тем более эффективен объект по соотношению полезности к стоимости
-            </Typography>
-          </>
-        )}
-      </Dialog>
-      
-      {/* Радикально измененный интерфейс автогенерации вместо Dialog */}
-      {generationDialog && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1400,
-            bgcolor: 'rgba(0, 0, 0, 0.5)',
+      {showAddColumnForm && (
+        <Backdrop
+          open={showAddColumnForm}
+          onClick={() => setShowAddColumnForm(false)}
+          sx={{ 
+            zIndex: 1300,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'center'
           }}
-          onClick={handleCloseGenerationDialog}
         >
-          <Box
+          <Paper
+            onClick={(e) => e.stopPropagation()}
             sx={{
-              bgcolor: 'background.paper',
-              boxShadow: 24,
-              borderRadius: 2,
-              p: 4,
               width: '100%',
-              maxWidth: 500,
-              maxHeight: '90vh',
-              overflow: 'auto',
+              maxWidth: '500px',
+              p: 3,
+              overflowY: 'auto',
               position: 'relative'
             }}
-            onClick={(e) => e.stopPropagation()}
           >
+            <Typography variant="h6" component="h2" gutterBottom>
+              Добавление новой характеристики
+            </Typography>
+            
+            <TextField
+              fullWidth
+              label="Название характеристики"
+              value={newColumnName}
+              onChange={(e) => setNewColumnName(e.target.value)}
+              margin="normal"
+              required
+            />
+            <TextField
+              fullWidth
+              label="Вес (важность)"
+              type="number"
+              value={newColumnWeight}
+              onChange={(e) => setNewColumnWeight(e.target.value)}
+              margin="normal"
+              inputProps={{ min: 0, max: 100 }}
+              helperText="Чем больше вес, тем больше влияние на общую полезность (от 0 до 100)"
+            />
+            
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+              <Button onClick={() => setShowAddColumnForm(false)} sx={{ mr: 1 }}>
+                Отмена
+              </Button>
+              <Button variant="contained" color="primary" onClick={handleAddColumn}>
+                Добавить
+              </Button>
+            </Box>
+          </Paper>
+        </Backdrop>
+      )}
+      
+      {/* Модальное окно для добавления объекта */}
+      {modalOpen && (
+        <Backdrop
+          open={modalOpen}
+          onClick={handleCloseModal}
+          sx={{ 
+            zIndex: 1300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <Paper
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              width: '100%',
+              maxWidth: '800px',
+              p: 3,
+              overflowY: 'auto',
+              position: 'relative'
+            }}
+          >
+            <Typography variant="h6" component="h2" gutterBottom>
+              Добавление нового объекта
+            </Typography>
+            
+            <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+              <TextField
+                fullWidth
+                required
+                label="Название объекта"
+                name="name"
+                value={formData.name || ''}
+                onChange={handleInputChange}
+                error={Boolean(formErrors.name)}
+                helperText={formErrors.name}
+                margin="normal"
+              />
+              <TextField
+                fullWidth
+                label="Стоимость"
+                name="cost"
+                type="number"
+                value={formData.cost || ''}
+                onChange={handleInputChange}
+                error={Boolean(formErrors.cost)}
+                helperText={formErrors.cost || 'Оставьте пустым, если стоимость неизвестна'}
+                margin="normal"
+                inputProps={{ min: 0 }}
+              />
+              <TextField
+                fullWidth
+                label="Описание"
+                name="description"
+                multiline
+                rows={2}
+                value={formData.description || ''}
+                onChange={handleInputChange}
+                margin="normal"
+              />
+              
+              <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+                Характеристики объекта
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {tableData && tableData.columns && tableData.columns.map((column) => (
+                  <Grid item xs={12} sm={6} key={column._id || column.name}>
+                    <TextField
+                      fullWidth
+                      label={column.name}
+                      name={column._id}
+                      type="number"
+                      value={formData[column._id] || ''}
+                      onChange={handleInputChange}
+                      error={Boolean(formErrors[column._id])}
+                      helperText={formErrors[column._id] || `Вес: ${column.weight || 10}`}
+                      margin="normal"
+                      inputProps={{ min: 0, max: 10, step: 0.1 }}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+              
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button onClick={handleCloseModal} sx={{ mr: 1 }}>
+                  Отмена
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  type="submit"
+                >
+                  Добавить
+                </Button>
+              </Box>
+            </Box>
+          </Paper>
+        </Backdrop>
+      )}
+      
+      {/* Модальное окно для аналитики - используем Backdrop и Paper вместо Dialog */}
+      {analyticsOpen && (
+        <Backdrop
+          open={analyticsOpen}
+          onClick={handleCloseAnalytics}
+          sx={{ 
+            zIndex: 1300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <Paper
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              maxHeight: '90vh',
+              width: '90%',
+              maxWidth: '1200px',
+              m: 'auto',
+              p: 3,
+              overflowY: 'auto',
+              position: 'relative'
+            }}
+          >
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              mb: 3 
+            }}>
+              <Typography variant="h5" component="h2">
+                Аналитика: {tableData?.name}
+              </Typography>
+              <IconButton onClick={handleCloseAnalytics}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            
+            <Tabs 
+              value={activeTab} 
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab icon={<BarChartIcon />} label="Сравнение объектов" />
+              <Tab icon={<InsightsIcon />} label="Радар характеристик" />
+              <Tab icon={<PieChartIcon />} label="Вес критериев" />
+              <Tab icon={<TrendingUpIcon />} label="Эффективность (польза/стоимость)" />
+            </Tabs>
+            
+            {/* Обернем содержимое в условную отрисовку */}
+            {tableData && tableData.items && tableData.columns && (
+              <>
+                {/* Вкладка 1: Гистограмма сравнения объектов */}
+                {activeTab === 0 && (
+                  <>
+                    <Typography variant="h6" gutterBottom>
+                      Сравнение объектов по общей полезности и характеристикам
+                    </Typography>
+                    <Box sx={{ height: 550, mb: 4 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={getComparisonChartData()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="name" 
+                            angle={-45} 
+                            textAnchor="end" 
+                            height={80}
+                            interval={0}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <YAxis />
+                          <RechartsTooltip 
+                            formatter={(value, name) => [`${value}`, name]}
+                            contentStyle={{ 
+                              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                              border: '1px solid #ccc',
+                              borderRadius: '4px',
+                              padding: '10px'
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="top" 
+                            wrapperStyle={{ 
+                              paddingBottom: 20,
+                              fontSize: 12
+                            }}
+                          />
+                          <Bar dataKey="utility" fill="#8884d8" name="Общая полезность" strokeWidth={2} stroke="#6c60c9" />
+                          <Bar dataKey="cost" fill="#82ca9d" name="Стоимость" opacity={0.7} />
+                          {tableData?.columns.map((column, index) => (
+                            <Bar 
+                              key={column.name} 
+                              dataKey={column.name} 
+                              fill={COLORS[index % COLORS.length]} 
+                              name={column.name}
+                              opacity={0.8}
+                            />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </>
+                )}
+                
+                {/* Вкладка 2: Радарная диаграмма */}
+                {activeTab === 1 && (
+                  <>
+                    <Typography variant="h6" gutterBottom>
+                      Сравнение объектов по отдельным характеристикам (радар)
+                    </Typography>
+                    <Box sx={{ height: 400, mb: 4 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart 
+                          cx="50%" 
+                          cy="50%" 
+                          outerRadius="80%" 
+                          data={getRadarChartData()}
+                        >
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="characteristic" />
+                          <PolarRadiusAxis angle={30} domain={[0, 10]} />
+                          {tableData?.items.map((item, index) => (
+                            <Radar 
+                              key={item._id} 
+                              name={item.name} 
+                              dataKey={item.name} 
+                              stroke={COLORS[index % COLORS.length]} 
+                              fill={COLORS[index % COLORS.length]} 
+                              fillOpacity={0.2} 
+                            />
+                          ))}
+                          <Legend />
+                          <RechartsTooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </>
+                )}
+                
+                {/* Вкладка 3: Круговая диаграмма весов критериев */}
+                {activeTab === 2 && (
+                  <>
+                    <Typography variant="h6" gutterBottom>
+                      Распределение весов критериев оценки
+                    </Typography>
+                    <Box sx={{ height: 400, mb: 4 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={getPieChartData()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            outerRadius={150}
+                            fill="#8884d8"
+                            dataKey="value"
+                            nameKey="name"
+                            label={(entry) => entry.name}
+                          >
+                            {getPieChartData().map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(value) => [`${value}%`, 'Вес']} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </>
+                )}
+                
+                {/* Вкладка 4: Диаграмма соотношения полезности к стоимости */}
+                {activeTab === 3 && (
+                  <>
+                    <Typography variant="h6" gutterBottom>
+                      Эффективность объектов (соотношение полезности к стоимости)
+                    </Typography>
+                    <Box sx={{ height: 400, mb: 4 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={getUtilityToCostData()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                          layout="vertical"
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" />
+                          <YAxis dataKey="name" type="category" width={150} />
+                          <RechartsTooltip 
+                            formatter={(value) => [`${value.toFixed(4)}`, 'Эффективность']} 
+                          />
+                          <Legend />
+                          <Bar 
+                            dataKey="value" 
+                            fill="#8884d8" 
+                            name="Польза / Стоимость" 
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                      * Чем выше значение, тем более эффективен объект по соотношению полезности к стоимости
+                    </Typography>
+                  </>
+                )}
+              </>
+            )}
+          </Paper>
+        </Backdrop>
+      )}
+      
+      {/* Диалог автогенерации */}
+      {generationDialog && (
+        <Dialog
+          open={generationDialog}
+          onClose={handleCloseGenerationDialog}
+          maxWidth="sm"
+          fullWidth
+          sx={{ zIndex: 1400 }}
+        >
+          <DialogContent sx={{ p: 3 }}>
             <IconButton
               sx={{ position: 'absolute', top: 8, right: 8 }}
               onClick={handleCloseGenerationDialog}
@@ -3051,8 +3158,8 @@ const TableView = () => {
                 {generatingTable ? 'Генерация...' : 'Сгенерировать'}
               </Button>
             </Box>
-          </Box>
-        </Box>
+          </DialogContent>
+        </Dialog>
       )}
     </PageContainer>
   );
